@@ -2,69 +2,57 @@
 
 using namespace std;
 
+std::vector<int> PyList_toVecInt(PyObject* py_list);
+
 extern "C" Plugin::Object *createRTXIPlugin(void){
     return new rtxilfpInferenceEngine();
 }
 
 static DefaultGUIModel::variable_t vars[] = {
-{ 
-  "Time Window (s)", "Time Window (s)", 
-  DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE
-  },
-{ 
-  "Sampling Rate (Hz)", "Sampling Rate (Hz)", 
-  DefaultGUIModel::STATE | DefaultGUIModel::DOUBLE,
-  },
-{ 
-  "LF Lower Bound", "LF Lower Bound",
-  DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,
-  },
-{ 
-  "LF Upper Bound", "LF Upper Bound",
-  DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,
-  },
-{ 
-  "HF Lower Bound", "HF Lower Bound",
-  DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,
-  },
-{ 
-  "HF Upper Bound", "HF Upper Bound",
-  DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,
-  },  
-{
-    "input_LFP", "Input LFP",
-    DefaultGUIModel::INPUT | DefaultGUIModel::DOUBLE,
-  },
-{
-    "ratio", "Output LFP Power Ratio",
-    DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,
-  },
-{
-    "LF Power", "Power in LF Band",
-    DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,
-  },
-{
-    "HF Power", "Power in HF Band",
-    DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,
-  }
+
+  // Parameters
+  { "Time Window (s)", "Time Window (s)", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE},
+  { "Sampling Rate (Hz)", "Sampling Rate (Hz)", DefaultGUIModel::STATE | DefaultGUIModel::DOUBLE,},
+  //{ "LF Lower Bound", "LF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  //{ "LF Upper Bound", "LF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  //{ "HF Lower Bound", "HF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  //{ "HF Upper Bound", "HF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "Animal", "Animal", DefaultGUIModel::COMMENT, },  
+  { "Model", "Model", DefaultGUIModel::COMMENT, },  
+
+  // Inputs
+  { "input_LFP", "Input LFP", DefaultGUIModel::INPUT | DefaultGUIModel::DOUBLE,},
+
+  //Outputs
+  { "ratio", "Output LFP Power Ratio", DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,},
+  { "LF Power", "Power in LF Band", DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,},
+  { "HF Power", "Power in HF Band", DefaultGUIModel::OUTPUT | DefaultGUIModel::DOUBLE,},
+  { "State", "Estimated State", DefaultGUIModel::OUTPUT | DefaultGUIModel::UINTEGER,}
 };
 
 static size_t num_vars = sizeof(vars) / sizeof(DefaultGUIModel::variable_t);
 
 // defining what's in the object's constructor
 // sampling set by RT period
-rtxilfpInferenceEngine::rtxilfpInferenceEngine(void) :
-DefaultGUIModel("lfpInferenceEngine with Custom GUI", ::vars, ::num_vars),
+rtxilfpInferenceEngine::rtxilfpInferenceEngine(void) : DefaultGUIModel("lfpInferenceEngine with Custom GUI", ::vars, ::num_vars),
 period(((double)RT::System::getInstance()->getPeriod())*1e-9), // grabbing RT period
 sampling(1.0/period), // calculating RT sampling rate
-lfpratiometer(N, sampling) // constructing lfpRatiometer object
+lfpratiometer(N, sampling), // constructing lfpRatiometer object
+lfpinferenceengine()
+DEFAULT_ANIMAL("no-animal")
+DEFAULT_MODEL("no-model")
 {
-    setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an input, this module calculates the LF/HF ratio over a specified causal time window.</p>");
+    setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an lfp input, this module estimates the cortical state.</p>");
+    
+    animal = DEFAULT_ANIMAL;
+    model = DEFAULT_MODEL;
+
     DefaultGUIModel::createGUI(vars, num_vars);
     customizeGUI();
     update(INIT);
     refresh();
     QTimer::singleShot(0, this, SLOT(resizeMe()));
+    
 }
 
 // defining what's in the object's destructor
@@ -79,10 +67,29 @@ void rtxilfpRatiometer::execute(void) {
   // calculate LF/HF ratio
   lfpratiometer.calcRatio();
 
+  // estimate cortical state from FFT data
+  lfpratiometer.makeFFT();
+  
+  lfpinferenceengine.arguments_predict = {"pyfuncs","predict"};
+  lfpinferenceengine.PyArgs = {lfpinferenceengine.getModel(),
+                                lfpinferenceengine.getFeats(),
+                                lfpinferenceengine.getScaler(),
+                                lfpinferenceengine.getData()};
+  lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+
+  lfpinferenceengine.state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+
+
   // put the LF/HF ratio into the output
   output(0) = lfpratiometer.getRatio();
   output(1) = lfpratiometer.getLFpower();
   output(2) = lfpratiometer.getHFpower();
+  if (!state_vec.empty()) {
+    lfpinferenceengine.state = vec.back().c();
+  }else{
+    lfpinferenceengine.state = -1;
+  }
+  output(4) = lfpinferenceengine.state;
     
 }
 
@@ -98,6 +105,10 @@ void rtxilfpRatiometer::update(DefaultGUIModel::update_flags_t flag)
       setParameter("LF Upper Bound", lfpratiometer.getFreqBounds()[1]);
       setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
       setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
+
+      setParameter("Animal",animal);
+      setParameter("Model",model);
+
       break;
 
     case MODIFY:
@@ -115,6 +126,8 @@ void rtxilfpRatiometer::update(DefaultGUIModel::update_flags_t flag)
           getParameter("LF Upper Bound").toDouble(),
           getParameter("HF Lower Bound").toDouble(),
           getParameter("HF Upper Bound").toDouble());
+
+      lfpinferenceengine.init(getParameter("Animal"),getParameter("Model"));
       
       // setting DFT windowing function choice
       if (windowShape->currentIndex() == 0) {
@@ -156,4 +169,32 @@ void rtxilfpRatiometer::customizeGUI(void)
 
   customlayout->addWidget(windowShape, 2, 0);
   setLayout(customlayout);
+}
+
+std::vector<int> PyList_toVecInt(PyObject* py_list) {
+  if (PySequence_Check(py_list)) {
+    PyObject* seq = PySequenceFast(py_list, "expected a sequence");
+    if (seq != NULL){
+      std::vector<int> my_vector;
+      my_vectoor.reserve(PySequence_Fast_GET_SIZE(seq));
+      for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(seq); i++) {
+        PyObject* item = PySequence_Fast_GET_ITEM(seq,i);
+        if(PyNNumber_Check(item)){
+          Py_ssize_t value = PyNumber_AsSsize_t(item, PyExc_OverflowError);
+          if (value == -1 && PyErr_Occurred()) {
+            //handle error
+          }
+          my_vector.push_back(value);
+        } else {
+          //handle error
+        }
+      }
+      Py_DECREF(seq);
+      return my_vector;
+    } else {
+      //handle error
+    }
+  }else{
+    //handle error
+  }
 }

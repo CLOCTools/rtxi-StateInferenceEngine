@@ -1,14 +1,4 @@
-#include "lfpRatiometer.h"
-
-#include <stdio.h>
-#include <malloc.h>
-#include <math.h>
-#include <complex.h>
-
-#include <vector>
-#include <iostream>
-
-#include <fftw3.h>
+#include <lfpRatiometer>
 
 using namespace std;
 
@@ -20,12 +10,6 @@ lfpRatiometer::lfpRatiometer(int N_input, double sampling_input) {
     N=N_input;
     f_size=N/2 + 1;
     sampling=sampling_input;
-
-    // setting default variables
-    lf_low = 1;
-    lf_high = 25;
-    hf_low = 30;
-    hf_high = 90;
     
     // setting default window
     window_rect();
@@ -85,13 +69,6 @@ void lfpRatiometer::changeFFTPlan(int N_input, double sampling_input) {
 
 }
 
-// allows users to set ends of LF&HF bands
-void lfpRatiometer::setRatioParams(double lf_low_input, double lf_high_input, double hf_low_input, double hf_high_input) {
-    lf_low = lf_low_input;
-    lf_high = lf_high_input;
-    hf_low = hf_low_input;
-    hf_high = hf_high_input;
-}
 
 // allows users to push a new time series data point
 void lfpRatiometer::pushTimeSample(double input) {
@@ -141,39 +118,45 @@ void lfpRatiometer::window_hamming(){
         s2 = s2 + val*val;
     }
 }
-
-// function that calculates the LF/HF ratio
-void lfpRatiometer::calcRatio() {
-
-    // only calculate if the input vector is full
-    if (in_raw.size() == N) {
-        makePSD();
-
-        lf_total = 0;
-        hf_total = 0;
-
-        // iterates over PSD, calculating running sums in each band
-        for (int n=0; n<f_size; n++){
-            if (allfreqs.at(n)>= lf_low && allfreqs.at(n) <= lf_high) {
-                lf_total = lf_total + psd.at(n);
-            }
-            if (allfreqs.at(n) >= hf_low && allfreqs.at(n) <= hf_high){
-                hf_total = hf_total + psd.at(n);
-            }
-        }
-
-        // take ratio
-        lf_hf_ratio = lf_total/hf_total;
-    }
-    // else {lf_hf_ratio = nan("");}
-    else {lf_hf_ratio = -1;}
     
-
-}
 
 // function that calculates the power spectral density
 void lfpRatiometer::makePSD() {
     psd.clear(); // clear vector which stores PSD
+
+    if (in_raw.size() == N) {
+        // applying window
+        for (int n=0; n<N; n++){
+            in[n] = in_raw[n]*window[n];
+        }
+
+        fftw_execute(p); // FFTW3 calculate the DFT
+
+        // loop through DFT entries
+        for (int n=0; n<f_size; n++){
+            // calculate |y_n|^2
+            double fftsqr = out[n][0]*out[n][0] + out[n][1]*out[n][1];
+
+            // calculate PSD (described in Heinzel et al., 2002)
+            // DC & Nyquist freq is scaled to be consistent with MATLAB's spectrogram
+            // Usually, the edges should not matter because all frequencies of interest
+            // should be contained in the interior
+            // WILL CHANGE WITH WINDOWING
+            if (n==0 || ((n==f_size-1) && (N%2 == 0))) {
+                psd.push_back((1/(sampling*s2)) * fftsqr);
+            }
+            else {
+                psd.push_back(2*(1/(sampling*s2)) * fftsqr);
+            }
+        }
+    }
+
+    
+}
+
+// function that calculates the power spectral density
+void lfpRatiometer::makeFFTabs() {
+    fft_abs.clear(); // clear vector which stores PSD
 
     // applying window
     for (int n=0; n<N; n++){
@@ -187,16 +170,6 @@ void lfpRatiometer::makePSD() {
         // calculate |y_n|^2
         double fftsqr = out[n][0]*out[n][0] + out[n][1]*out[n][1];
 
-        // calculate PSD (described in Heinzel et al., 2002)
-        // DC & Nyquist freq is scaled to be consistent with MATLAB's spectrogram
-        // Usually, the edges should not matter because all frequencies of interest
-        // should be contained in the interior
-        // WILL CHANGE WITH WINDOWING
-        if (n==0 || n==f_size-1) {
-            psd.push_back((1/(sampling*s2)) * fftsqr);
-        }
-        else {
-            psd.push_back(2*(1/(sampling*s2)) * fftsqr);
-        }
+        fft_abs.push_back(sqrt(fftsqr));
     }
 }

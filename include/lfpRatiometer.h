@@ -1,15 +1,10 @@
+#ifndef LFPRATIOMETER_H
+#define LFPRATIOMETER_H
+
+// just here so clangd can resolve these symbols
 #ifndef LFPRATIOMETER
-#define LFPRATIOMETER
-
-#include <stdio.h>
-#include <malloc.h>
-#include <math.h>
-#include <complex.h>
-
-#include <vector>
-#include <iostream>
-
-#include <fftw3.h>
+#include <lfpRatiometer>
+#endif
 
 class lfpRatiometer {
     public:
@@ -19,40 +14,28 @@ class lfpRatiometer {
         // destructor
         ~lfpRatiometer(void);
 
-        // changing FFT plan (for RTXI only)
+        // changing FFT plan
         void changeFFTPlan(int N_input, double sampling_input);
-
-        // calculate LF/HF ratio
-        void calcRatio();
 
         // setting windowing function
         void window_rect();
         void window_hamming();
 
-        // setting parameters
-        // note that to change FFT parameters, a new object needs to be created
-        void setRatioParams(double lf_low_input, double lf_high_input, double hf_low_input, double hf_high_input);
-
         // getting parameters
-        double getRatio() const { return lf_hf_ratio; };
-        double getLFpower() const { return lf_total; };
-        double getHFpower() const { return hf_total; };
         std::vector<double> getFreqs() { return allfreqs; };
         std::vector<double> getPSD() { return psd; }
-        std::vector<double> getFreqBounds() { 
-            std::vector<double> freqbounds;
-            freqbounds.push_back(lf_low);
-            freqbounds.push_back(lf_high);
-            freqbounds.push_back(hf_low);
-            freqbounds.push_back(hf_high);
-            return freqbounds;
-        };
-
+        std::vector<double> getFFTabs() { return fft_abs; };
+        std::vector<double> getBuffer() { return in_raw; };
+        std::vector<double> getWindow() { return window; };
 
         // modifying raw time series
         void pushTimeSample(double input);
         void setTimeSeries(std::vector<double> inputSeries);
         void clrTimeSeries();
+
+        // FFT calculations
+        void makePSD();
+        void makeFFTabs();
         
     protected:
 
@@ -68,18 +51,10 @@ class lfpRatiometer {
         std::vector<double> allfreqs;
 
         std::vector<double> psd;
-        double lf_hf_ratio;
-        double lf_total;
-        double hf_total;
-        double lf_low;
-        double lf_high;
-        double hf_low;
-        double hf_high;
+        std::vector<double> fft_abs;
 
         std::vector<double> window; // time domain of window
         double s2; // window scaling factor
-
-        void makePSD();
 
 
 };

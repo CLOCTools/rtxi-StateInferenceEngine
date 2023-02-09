@@ -4,7 +4,9 @@ HEADERS = rtxi-lfpInferenceEngine.h
 
 SOURCES = rtxi-lfpInferenceEngine.cpp \
 			src/lfpInferenceEngine.cpp \
+			include/lfpInferenceEngine.h \
 			src/lfpRatiometer.cpp \
+			include/lfpRatiometer.h \
 			moc_rtxi-lfpRatiometer.cpp
 
 LIBS =

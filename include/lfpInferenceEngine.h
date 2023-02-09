@@ -38,6 +38,11 @@ class lfpInferenceEngine {
         PyObject* getScaler() {return pScaler;};
         PyObject* getInference() {return pInference;};
         PyObject* getData() {return pData;};
+
+        int state;
+        std::vector<int> state_vec;
+        std::vector<std::string> arguments_predict;
+        std::vector<PyObject*> pyArgs;
         
     protected:
 
