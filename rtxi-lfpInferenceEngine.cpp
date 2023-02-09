@@ -53,13 +53,13 @@ static size_t num_vars = sizeof(vars) / sizeof(DefaultGUIModel::variable_t);
 
 // defining what's in the object's constructor
 // sampling set by RT period
-rtxilfpRatiometer::rtxilfpRatiometer(void) :
-DefaultGUIModel("lfpRatiometer with Custom GUI", ::vars, ::num_vars),
+rtxilfpInferenceEngine::rtxilfpInferenceEngine(void) :
+DefaultGUIModel("lfpInferenceEngine with Custom GUI", ::vars, ::num_vars),
 period(((double)RT::System::getInstance()->getPeriod())*1e-9), // grabbing RT period
 sampling(1.0/period), // calculating RT sampling rate
 lfpratiometer(N, sampling) // constructing lfpRatiometer object
 {
-    setWhatsThis("<p><b>lfpRatiometer:</b><br>Given an input, this module calculates the LF/HF ratio over a specified causal time window.</p>");
+    setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an input, this module calculates the LF/HF ratio over a specified causal time window.</p>");
     DefaultGUIModel::createGUI(vars, num_vars);
     customizeGUI();
     update(INIT);
