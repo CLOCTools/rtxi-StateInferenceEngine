@@ -1,4 +1,4 @@
-#include <lfpRatiometer>
+#include "lfpRatiometer.h"
 
 using namespace std;
 
@@ -10,6 +10,12 @@ lfpRatiometer::lfpRatiometer(int N_input, double sampling_input) {
     N=N_input;
     f_size=N/2 + 1;
     sampling=sampling_input;
+
+    // setting default variables
+    lf_low = 1;
+    lf_high = 25;
+    hf_low = 30;
+    hf_high = 90;
     
     // setting default window
     window_rect();
@@ -69,6 +75,13 @@ void lfpRatiometer::changeFFTPlan(int N_input, double sampling_input) {
 
 }
 
+// allows users to set ends of LF&HF bands
+void lfpRatiometer::setRatioParams(double lf_low_input, double lf_high_input, double hf_low_input, double hf_high_input) {
+    lf_low = lf_low_input;
+    lf_high = lf_high_input;
+    hf_low = hf_low_input;
+    hf_high = hf_high_input;
+}
 
 // allows users to push a new time series data point
 void lfpRatiometer::pushTimeSample(double input) {
@@ -119,6 +132,34 @@ void lfpRatiometer::window_hamming(){
     }
 }
     
+// function that calculates the LF/HF ratio
+void lfpRatiometer::calcRatio() {
+
+    // only calculate if the input vector is full
+    if (in_raw.size() == N) {
+        makePSD();
+
+        lf_total = 0;
+        hf_total = 0;
+
+        // iterates over PSD, calculating running sums in each band
+        for (int n=0; n<f_size; n++){
+            if (allfreqs.at(n)>= lf_low && allfreqs.at(n) <= lf_high) {
+                lf_total = lf_total + psd.at(n);
+            }
+            if (allfreqs.at(n) >= hf_low && allfreqs.at(n) <= hf_high){
+                hf_total = hf_total + psd.at(n);
+            }
+        }
+
+        // take ratio
+        lf_hf_ratio = lf_total/hf_total;
+    }
+    // else {lf_hf_ratio = nan("");}
+    else {lf_hf_ratio = -1;}
+    
+
+}
 
 // function that calculates the power spectral density
 void lfpRatiometer::makePSD() {

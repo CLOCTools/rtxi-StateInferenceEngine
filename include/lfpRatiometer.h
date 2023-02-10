@@ -3,8 +3,14 @@
 
 // just here so clangd can resolve these symbols
 #ifndef LFPRATIOMETER
-#include <lfpRatiometer>
+#include "lfpRatiometer.h"
 #endif
+
+#include <vector>
+#include <malloc.h>
+#include <math.h>
+#include <complex.h>
+#include <fftw3.h>
 
 class lfpRatiometer {
     public:
@@ -17,9 +23,21 @@ class lfpRatiometer {
         // changing FFT plan
         void changeFFTPlan(int N_input, double sampling_input);
 
+        // calculate LF/HF ratio
+        void calcRatio(); 
+
         // setting windowing function
         void window_rect();
         void window_hamming();
+
+        // setting parameters
+        // note that to change FFT parameters, a new object needs to be created
+        void setRatioParams(double lf_low_input, double lf_high_input, double hf_low_input, double hf_high_input); // ADDED
+
+        // getting parameters
+        double getRatio() const { return lf_hf_ratio; }; 
+        double getLFpower() const { return lf_total; }; 
+        double getHFpower() const { return hf_total; };
 
         // getting parameters
         std::vector<double> getFreqs() { return allfreqs; };
@@ -27,6 +45,15 @@ class lfpRatiometer {
         std::vector<double> getFFTabs() { return fft_abs; };
         std::vector<double> getBuffer() { return in_raw; };
         std::vector<double> getWindow() { return window; };
+
+        std::vector<double> getFreqBounds() { 
+            std::vector<double> freqbounds;
+            freqbounds.push_back(lf_low);
+            freqbounds.push_back(lf_high);
+            freqbounds.push_back(hf_low);
+            freqbounds.push_back(hf_high);
+            return freqbounds;
+        };  
 
         // modifying raw time series
         void pushTimeSample(double input);
@@ -52,6 +79,13 @@ class lfpRatiometer {
 
         std::vector<double> psd;
         std::vector<double> fft_abs;
+        double lf_hf_ratio;
+        double lf_total;
+        double hf_total;
+        double lf_low;
+        double lf_high;
+        double hf_low;
+        double hf_high;
 
         std::vector<double> window; // time domain of window
         double s2; // window scaling factor

@@ -1,6 +1,9 @@
 #ifndef RTXILFPINFERENCEENGINE_H
 #define RTXILFPINFERENCEENGINE_H
 
+#include <cstring>
+#include <string>
+
 #include <default_gui_model.h>
 #include <main_window.h>
 #include "lfpRatiometer.h"
@@ -35,6 +38,20 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         int N = 1000; // initialized to 1000 samples (1s for 1kHz sampling)
         double period; // set from RT period
         double sampling; // set based on RT period
+
+        // Model loading
+        const QString DEFAULT_ANIMAL;
+        const QString DEFAULT_MODEL;
+        QString animal;
+        QString model;
+        
+        // declarations for state inference
+        int state;
+        std::vector<int> state_vec;
+
+        // parameters for inputs into python functions
+        std::vector<std::string> arguments_predict;
+        std::vector<PyObject*> pyArgs;
 
         // lfpRatiometer object
         lfpRatiometer lfpratiometer;

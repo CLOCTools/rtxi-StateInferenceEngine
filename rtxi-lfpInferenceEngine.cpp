@@ -38,8 +38,8 @@ rtxilfpInferenceEngine::rtxilfpInferenceEngine(void) : DefaultGUIModel("lfpInfer
 period(((double)RT::System::getInstance()->getPeriod())*1e-9), // grabbing RT period
 sampling(1.0/period), // calculating RT sampling rate
 lfpratiometer(N, sampling), // constructing lfpRatiometer object
-lfpinferenceengine()
-DEFAULT_ANIMAL("no-animal")
+lfpinferenceengine(),
+DEFAULT_ANIMAL("no-animal"),
 DEFAULT_MODEL("no-model")
 {
     setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an lfp input, this module estimates the cortical state.</p>");
@@ -56,55 +56,55 @@ DEFAULT_MODEL("no-model")
 }
 
 // defining what's in the object's destructor
-rtxilfpRatiometer::~rtxilfpRatiometer(void) { }
+rtxilfpInferenceEngine::~rtxilfpInferenceEngine(void) { }
 
 // real-time RTXI function
-void rtxilfpRatiometer::execute(void) {
+void rtxilfpInferenceEngine::execute(void) {
 
   // push new time series reading to lfpRatiometer
   lfpratiometer.pushTimeSample(input(0));
 
   // calculate LF/HF ratio
-  lfpratiometer.calcRatio();
+  //lfpratiometer.calcRatio();
 
   // estimate cortical state from FFT data
-  lfpratiometer.makeFFT();
+  lfpratiometer.makeFFTabs();
   
-  lfpinferenceengine.arguments_predict = {"pyfuncs","predict"};
-  lfpinferenceengine.PyArgs = {lfpinferenceengine.getModel(),
+  arguments_predict = {"pyfuncs","predict"};
+  pyArgs = {lfpinferenceengine.getModel(),
                                 lfpinferenceengine.getFeats(),
                                 lfpinferenceengine.getScaler(),
                                 lfpinferenceengine.getData()};
   lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
 
-  lfpinferenceengine.state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
 
 
   // put the LF/HF ratio into the output
-  output(0) = lfpratiometer.getRatio();
-  output(1) = lfpratiometer.getLFpower();
-  output(2) = lfpratiometer.getHFpower();
+  //output(0) = lfpratiometer.getRatio();
+  //output(1) = lfpratiometer.getLFpower();
+  //output(2) = lfpratiometer.getHFpower();
   if (!state_vec.empty()) {
-    lfpinferenceengine.state = vec.back().c();
+    state = state_vec.back();
   }else{
-    lfpinferenceengine.state = -1;
+    state = -1;
   }
-  output(4) = lfpinferenceengine.state;
+  output(4) = state;
     
 }
 
 // update function (not running in real time)
-void rtxilfpRatiometer::update(DefaultGUIModel::update_flags_t flag)
+void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
 {
   switch (flag) {
     case INIT:
       setParameter("Time Window (s)", sampling/N);
       setState("Sampling Rate (Hz)", sampling);
       // get bounds from lfpratiometer object
-      setParameter("LF Lower Bound", lfpratiometer.getFreqBounds()[0]);
-      setParameter("LF Upper Bound", lfpratiometer.getFreqBounds()[1]);
-      setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
-      setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
+      //setParameter("LF Lower Bound", lfpratiometer.getFreqBounds()[0]);
+      //setParameter("LF Upper Bound", lfpratiometer.getFreqBounds()[1]);
+      //setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
+      //setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
 
       setParameter("Animal",animal);
       setParameter("Model",model);
@@ -127,7 +127,7 @@ void rtxilfpRatiometer::update(DefaultGUIModel::update_flags_t flag)
           getParameter("HF Lower Bound").toDouble(),
           getParameter("HF Upper Bound").toDouble());
 
-      lfpinferenceengine.init(getParameter("Animal"),getParameter("Model"));
+      lfpinferenceengine.init(getParameter("Animal").toStdString(),getParameter("Model").toStdString());
       
       // setting DFT windowing function choice
       if (windowShape->currentIndex() == 0) {
@@ -158,7 +158,7 @@ void rtxilfpRatiometer::update(DefaultGUIModel::update_flags_t flag)
 }
 
 // RTXI's customizeGUI function
-void rtxilfpRatiometer::customizeGUI(void)
+void rtxilfpInferenceEngine::customizeGUI(void)
 {
   QGridLayout* customlayout = DefaultGUIModel::getLayout();
 
@@ -173,13 +173,13 @@ void rtxilfpRatiometer::customizeGUI(void)
 
 std::vector<int> PyList_toVecInt(PyObject* py_list) {
   if (PySequence_Check(py_list)) {
-    PyObject* seq = PySequenceFast(py_list, "expected a sequence");
+    PyObject* seq = PySequence_Fast(py_list, "expected a sequence");
     if (seq != NULL){
       std::vector<int> my_vector;
-      my_vectoor.reserve(PySequence_Fast_GET_SIZE(seq));
+      my_vector.reserve(PySequence_Fast_GET_SIZE(seq));
       for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(seq); i++) {
         PyObject* item = PySequence_Fast_GET_ITEM(seq,i);
-        if(PyNNumber_Check(item)){
+        if(PyNumber_Check(item)){
           Py_ssize_t value = PyNumber_AsSsize_t(item, PyExc_OverflowError);
           if (value == -1 && PyErr_Occurred()) {
             //handle error

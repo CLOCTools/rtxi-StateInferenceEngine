@@ -1,13 +1,14 @@
-PLUGIN_NAME = rtxilfpInferenceEngine
+PLUGIN_NAME = rtxi-lfpInferenceEngine
 
 HEADERS = rtxi-lfpInferenceEngine.h
 
 SOURCES = rtxi-lfpInferenceEngine.cpp \
-			src/lfpInferenceEngine.cpp \
+			moc_rtxi-lfpRatiometer.cpp \
 			include/lfpInferenceEngine.h \
-			src/lfpRatiometer.cpp \
+			src/lfpInferenceEngine.cpp \
 			include/lfpRatiometer.h \
-			moc_rtxi-lfpRatiometer.cpp
+			src/lfpRatiometer.cpp 
+			
 
 LIBS =
 
