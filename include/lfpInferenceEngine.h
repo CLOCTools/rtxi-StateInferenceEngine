@@ -42,6 +42,10 @@ class lfpInferenceEngine {
         PyObject* getScaler() {return pScaler;};
         PyObject* getInference() {return pInference;};
         PyObject* getData() {return pData;};
+
+        std::vector<int> predict();
+
+        std::vector<int> PyList_toVecInt(PyObject* py_list);
         
     protected:
 

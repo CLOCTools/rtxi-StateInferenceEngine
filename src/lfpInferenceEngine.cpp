@@ -209,3 +209,43 @@ void lfpInferenceEngine::load_data() {
 
     pData = pResult;
 }
+
+std::vector<int> lfpInferenceEngine::predict() {
+    std::vector<std::string> arguments_predict = {"pyfuncs","predict"};
+    std::vector<PyObject*> pyArgs = {pModel,
+                                    pFeats,
+                                    pScaler,
+                                    pData};
+    
+    this->callPythonFunction(arguments_predict, pyArgs);
+
+    return this->PyList_toVecInt(pResult);
+}
+
+std::vector<int> lfpInferenceEngine::PyList_toVecInt(PyObject* py_list) {
+  if (PySequence_Check(py_list)) {
+    PyObject* seq = PySequence_Fast(py_list, "expected a sequence");
+    if (seq != NULL){
+      std::vector<int> my_vector;
+      my_vector.reserve(PySequence_Fast_GET_SIZE(seq));
+      for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(seq); i++) {
+        PyObject* item = PySequence_Fast_GET_ITEM(seq,i);
+        if(PyNumber_Check(item)){
+          Py_ssize_t value = PyNumber_AsSsize_t(item, PyExc_OverflowError);
+          if (value == -1 && PyErr_Occurred()) {
+            //handle error
+          }
+          my_vector.push_back(value);
+        } else {
+          //handle error
+        }
+      }
+      Py_DECREF(seq);
+      return my_vector;
+    } else {
+      //handle error
+    }
+  }else{
+    //handle error
+  }
+}

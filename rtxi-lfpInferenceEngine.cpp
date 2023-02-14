@@ -82,25 +82,15 @@ void rtxilfpInferenceEngine::execute(void) {
   // estimate cortical state from FFT data
   lfpratiometer.makeFFTabs();
   
-  arguments_predict = {"pyfuncs","predict"};
-  /*
-  pyArgs = {lfpinferenceengine.getModel(),
-                                lfpinferenceengine.getFeats(),
-                                lfpinferenceengine.getScaler(),
-                                lfpinferenceengine.getData()};
-  
-  lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
-
-  
-  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+  state_vec = lfpinferenceengine.predict();
   
   if (!state_vec.empty()) {
     state = state_vec.back();
   }else{
     state = -1;
   }
-  output(4) = state;
-  */
+  output(3) = state;
+  
   
     
 }
@@ -141,13 +131,18 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
 
       lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
 
-      arguments_predict = {"pyfuncs","predict"};
+      //arguments_predict = {"pyfuncs","predict"};
       start = std::chrono::high_resolution_clock::now();
+      state_vec = lfpinferenceengine.predict();
+      /*
       pyArgs = {lfpinferenceengine.getModel(),
                                     lfpinferenceengine.getFeats(),
                                     lfpinferenceengine.getScaler(),
                                     lfpinferenceengine.getData()};
       lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+
+      state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+      */
       stop = std::chrono::high_resolution_clock::now();
       duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
