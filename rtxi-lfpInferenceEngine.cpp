@@ -1,5 +1,7 @@
 #include <rtxi-lfpInferenceEngine.h>
 
+#include <chrono>
+
 using namespace std;
 
 std::vector<int> PyList_toVecInt(PyObject* py_list);
@@ -13,12 +15,12 @@ static DefaultGUIModel::variable_t vars[] = {
   // Parameters
   { "Time Window (s)", "Time Window (s)", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE},
   { "Sampling Rate (Hz)", "Sampling Rate (Hz)", DefaultGUIModel::STATE | DefaultGUIModel::DOUBLE,},
-  //{ "LF Lower Bound", "LF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
-  //{ "LF Upper Bound", "LF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
-  //{ "HF Lower Bound", "HF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
-  //{ "HF Upper Bound", "HF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
-  { "Animal", "Animal", DefaultGUIModel::COMMENT, },  
-  { "Model", "Model", DefaultGUIModel::COMMENT, },  
+  { "LF Lower Bound", "LF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "LF Upper Bound", "LF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "HF Lower Bound", "HF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "HF Upper Bound", "HF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "Animal", "Animal name", DefaultGUIModel::COMMENT, },  
+  { "Model", "Model name", DefaultGUIModel::COMMENT, },  
 
   // Inputs
   { "input_LFP", "Input LFP", DefaultGUIModel::INPUT | DefaultGUIModel::DOUBLE,},
@@ -31,6 +33,9 @@ static DefaultGUIModel::variable_t vars[] = {
 };
 
 static size_t num_vars = sizeof(vars) / sizeof(DefaultGUIModel::variable_t);
+std::vector<int> my_vector;
+std::chrono::time_point<std::chrono::system_clock> start, stop;
+std::chrono::microseconds duration;
 
 // defining what's in the object's constructor
 // sampling set by RT period
@@ -46,6 +51,7 @@ DEFAULT_MODEL("no-model")
     
     animal = DEFAULT_ANIMAL;
     model = DEFAULT_MODEL;
+
 
     DefaultGUIModel::createGUI(vars, num_vars);
     customizeGUI();
@@ -65,31 +71,37 @@ void rtxilfpInferenceEngine::execute(void) {
   lfpratiometer.pushTimeSample(input(0));
 
   // calculate LF/HF ratio
-  //lfpratiometer.calcRatio();
+  lfpratiometer.calcRatio();
 
+  // put the LF/HF ratio into the output
+  output(0) = lfpratiometer.getRatio();
+  output(1) = lfpratiometer.getLFpower();
+  output(2) = lfpratiometer.getHFpower();
+
+  
   // estimate cortical state from FFT data
   lfpratiometer.makeFFTabs();
   
   arguments_predict = {"pyfuncs","predict"};
+  /*
   pyArgs = {lfpinferenceengine.getModel(),
                                 lfpinferenceengine.getFeats(),
                                 lfpinferenceengine.getScaler(),
                                 lfpinferenceengine.getData()};
+  
   lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
 
+  
   state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
-
-
-  // put the LF/HF ratio into the output
-  //output(0) = lfpratiometer.getRatio();
-  //output(1) = lfpratiometer.getLFpower();
-  //output(2) = lfpratiometer.getHFpower();
+  
   if (!state_vec.empty()) {
     state = state_vec.back();
   }else{
     state = -1;
   }
   output(4) = state;
+  */
+  
     
 }
 
@@ -101,10 +113,10 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
       setParameter("Time Window (s)", sampling/N);
       setState("Sampling Rate (Hz)", sampling);
       // get bounds from lfpratiometer object
-      //setParameter("LF Lower Bound", lfpratiometer.getFreqBounds()[0]);
-      //setParameter("LF Upper Bound", lfpratiometer.getFreqBounds()[1]);
-      //setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
-      //setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
+      setParameter("LF Lower Bound", lfpratiometer.getFreqBounds()[0]);
+      setParameter("LF Upper Bound", lfpratiometer.getFreqBounds()[1]);
+      setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
+      setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
 
       setParameter("Animal",animal);
       setParameter("Model",model);
@@ -127,7 +139,25 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
           getParameter("HF Lower Bound").toDouble(),
           getParameter("HF Upper Bound").toDouble());
 
-      lfpinferenceengine.init(getParameter("Animal").toStdString(),getParameter("Model").toStdString());
+      lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
+
+      arguments_predict = {"pyfuncs","predict"};
+      start = std::chrono::high_resolution_clock::now();
+      pyArgs = {lfpinferenceengine.getModel(),
+                                    lfpinferenceengine.getFeats(),
+                                    lfpinferenceengine.getScaler(),
+                                    lfpinferenceengine.getData()};
+      lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+      stop = std::chrono::high_resolution_clock::now();
+      duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
+      std::cout << "Predict time: " << duration.count() << std::endl;
+      printf("Result of call: \n");
+      my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
+      for (int j = 0; j < my_vector.size(); j++) {
+      std::cout << my_vector[j] << " ";
+      }
+      std::cout << std::endl;
       
       // setting DFT windowing function choice
       if (windowShape->currentIndex() == 0) {

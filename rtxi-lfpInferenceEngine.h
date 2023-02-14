@@ -6,6 +6,7 @@
 
 #include <default_gui_model.h>
 #include <main_window.h>
+#include <plotdialog.h>
 #include "lfpRatiometer.h"
 #include "lfpInferenceEngine.h"
 
@@ -26,6 +27,8 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         // functions to make GUI
         void createGUI(DefaultGUIModel::variable_t*, int);
         void customizeGUI(void);
+
+        //void resetVars(void);
         
     protected:
 
