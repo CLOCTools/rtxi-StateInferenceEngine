@@ -89,6 +89,7 @@ def viterbi(pi0, Ps, ll):
     # time-varying (hetero)
     hetero = (Ps.shape[0] == T-1)
     if not hetero:
+        print(Ps.shape)
         assert Ps.shape[0] == 1
 
     # Pass max-sum messages backward

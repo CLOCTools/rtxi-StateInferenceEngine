@@ -34,7 +34,10 @@ class lfpInferenceEngine {
         void setFeats(PyObject *newFeats);
         void setModel(PyObject *newModel);
         void setScaler(PyObject *newScaler);
+        
+        // Data manipulation
         void setData(std::vector<std::vector<double>> newData);
+        void pushFFTSample(std::vector<double> fft);
 
         PyObject* getResult() {return pResult;};
         PyObject* getModel() {return pModel;};
@@ -57,6 +60,9 @@ class lfpInferenceEngine {
         PyObject *pInference;
         PyObject *pResult;
         PyObject *pData;
+
+        std::vector<std::vector<double>> fftdata;
+        int N; //how many FFT samples to hold in memory
 
 };
 

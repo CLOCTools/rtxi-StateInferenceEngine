@@ -81,25 +81,26 @@ void rtxilfpInferenceEngine::execute(void) {
   
   // estimate cortical state from FFT data
   lfpratiometer.makeFFTabs();
+  lfpinferenceengine.pushFFTSample(lfpratiometer.getFFTabs());
   
   state_vec = lfpinferenceengine.predict();
-  arguments_predict = {"pyfuncs","predict"};
-  pyArgs = {pModel,
-                                    pFeats,
-                                    pScaler,
-                                    pData};
-    
-  arguments_predict = {"pyfuncs","dummy"};
-  //lfpinferenceengine.callPythonFunction(arguments_predict,{});
-  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
   /*
+  arguments_predict = {"pyfuncs","predict"};
+  pyArgs = {lfpinferenceengine.getModel(),
+                                    lfpinferenceengine.getModel(),
+                                    lfpinferenceengine.getModel(),
+                                    lfpinferenceengine.getModel()};
+
+  lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+  */
   printf("Result of call: \n");
       my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
       for (int j = 0; j < my_vector.size(); j++) {
       std::cout << my_vector[j] << " ";
       }
       std::cout << std::endl;
-  */
+  
   if (!state_vec.empty()) {
     state = state_vec.back();
   }else{

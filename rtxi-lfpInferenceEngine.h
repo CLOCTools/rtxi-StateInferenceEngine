@@ -63,6 +63,13 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         // variables for GUI
         QComboBox* windowShape;
 
+        PyObject *pModel;
+        PyObject *pFeats;
+        PyObject *pScaler;
+        PyObject *pData;
+
+        
+
 };
 
 
