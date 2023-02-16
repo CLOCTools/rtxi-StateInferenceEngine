@@ -68,12 +68,20 @@ void lfpInferenceEngine::init(string recording, string modelname) {
 
     this->setData(data);
     
+    std::vector<std::string> arguments_initialize = {"pyfuncs","initialize"};
+    std::vector<PyObject*> pyArgs = {this->getModel(),
+                this->getData()};
+    this->callPythonFunction(arguments_initialize, pyArgs);
+
     std::vector<std::string> arguments_predict = {"pyfuncs","predict"};
-    std::vector<PyObject*> pyArgs = {this->getModel(), 
+    pyArgs = {this->getModel(), 
                                     this->getFeats(), 
                                     this->getScaler(),
                                     this->getData()};
     this->callPythonFunction(arguments_predict, pyArgs);
+
+    
+
 }
 
 void lfpInferenceEngine::printInPython(void) {

@@ -44,14 +44,14 @@ period(((double)RT::System::getInstance()->getPeriod())*1e-9), // grabbing RT pe
 sampling(1.0/period), // calculating RT sampling rate
 lfpratiometer(N, sampling), // constructing lfpRatiometer object
 lfpinferenceengine(),
-DEFAULT_ANIMAL("no-animal"),
-DEFAULT_MODEL("no-model")
+DEFAULT_ANIMAL("AP103_1"),
+DEFAULT_MODEL("a")
 {
     setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an lfp input, this module estimates the cortical state.</p>");
     
     animal = DEFAULT_ANIMAL;
     model = DEFAULT_MODEL;
-
+    lfpinferenceengine.init(animal.toStdString(),model.toStdString());
 
     DefaultGUIModel::createGUI(vars, num_vars);
     customizeGUI();
@@ -83,7 +83,23 @@ void rtxilfpInferenceEngine::execute(void) {
   lfpratiometer.makeFFTabs();
   
   state_vec = lfpinferenceengine.predict();
-  
+  arguments_predict = {"pyfuncs","predict"};
+  pyArgs = {pModel,
+                                    pFeats,
+                                    pScaler,
+                                    pData};
+    
+  arguments_predict = {"pyfuncs","dummy"};
+  //lfpinferenceengine.callPythonFunction(arguments_predict,{});
+  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+  /*
+  printf("Result of call: \n");
+      my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
+      for (int j = 0; j < my_vector.size(); j++) {
+      std::cout << my_vector[j] << " ";
+      }
+      std::cout << std::endl;
+  */
   if (!state_vec.empty()) {
     state = state_vec.back();
   }else{
@@ -129,10 +145,16 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
           getParameter("HF Lower Bound").toDouble(),
           getParameter("HF Upper Bound").toDouble());
 
-      lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
+      start = std::chrono::high_resolution_clock::now();
+     
+      //lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
+      //pModel = Py_NewRef(lfpinferenceengine.getModel());
+      //pFeats = Py_NewRef(lfpinferenceengine.getFeats());
+      //pScaler = Py_NewRef(lfpinferenceengine.getScaler());
+      //pData = Py_NewRef(lfpinferenceengine.getData());
 
       //arguments_predict = {"pyfuncs","predict"};
-      start = std::chrono::high_resolution_clock::now();
+      //start = std::chrono::high_resolution_clock::now();
       state_vec = lfpinferenceengine.predict();
       /*
       pyArgs = {lfpinferenceengine.getModel(),
