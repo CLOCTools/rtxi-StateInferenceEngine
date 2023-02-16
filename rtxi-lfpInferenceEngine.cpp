@@ -51,6 +51,8 @@ DEFAULT_MODEL("a")
     
     animal = DEFAULT_ANIMAL;
     model = DEFAULT_MODEL;
+    count = 1;
+    fftstep = 40;
     lfpinferenceengine.init(animal.toStdString(),model.toStdString());
 
     DefaultGUIModel::createGUI(vars, num_vars);
@@ -68,7 +70,7 @@ rtxilfpInferenceEngine::~rtxilfpInferenceEngine(void) { }
 void rtxilfpInferenceEngine::execute(void) {
 
   // push new time series reading to lfpRatiometer
-  lfpratiometer.pushTimeSample(input(0));
+  lfpratiometer.pushTimeSample(input(0)/0.01);
 
   // calculate LF/HF ratio
   lfpratiometer.calcRatio();
@@ -80,9 +82,14 @@ void rtxilfpInferenceEngine::execute(void) {
 
   
   // estimate cortical state from FFT data
-  lfpratiometer.makeFFTabs();
-  lfpinferenceengine.pushFFTSample(lfpratiometer.getFFTabs());
-  
+  if (count == fftstep)
+  {
+    lfpratiometer.makeFFTabs();
+    fft = lfpratiometer.truncateFFT(lfpratiometer.getFreqs(),lfpratiometer.getFFTabs());
+    lfpinferenceengine.pushFFTSample(fft);
+    count = 1;
+  }
+  count++;
   state_vec = lfpinferenceengine.predict();
   /*
   arguments_predict = {"pyfuncs","predict"};
@@ -93,14 +100,14 @@ void rtxilfpInferenceEngine::execute(void) {
 
   lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
   state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
-  */
+  
   printf("Result of call: \n");
       my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
       for (int j = 0; j < my_vector.size(); j++) {
       std::cout << my_vector[j] << " ";
       }
       std::cout << std::endl;
-  
+  */
   if (!state_vec.empty()) {
     state = state_vec.back();
   }else{
@@ -194,6 +201,7 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
       break;
 
     case PAUSE:
+      lfpinferenceengine.reportFFTdata();
       lfpratiometer.clrTimeSeries();
       break;
 
@@ -246,3 +254,4 @@ std::vector<int> PyList_toVecInt(PyObject* py_list) {
     //handle error
   }
 }
+

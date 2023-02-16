@@ -174,16 +174,16 @@ int lfpInferenceEngine::callPythonFunction(vector<string> args, vector<PyObject*
 
 // Add FFT vector to back of data vector and erase first FFT
 void lfpInferenceEngine::pushFFTSample(std::vector<double> fft) {
-    std::cout << "fft size: " << fft.size() << std::endl;
+    //std::cout << "fft size: " << fft.size() << std::endl;
     fftdata.push_back(fft);
     //if (fftdata.size() > N) {
         // cut it to size
     fftdata.erase(fftdata.begin());
-    for (int i=0; i<fft.size(); i++)
+    /*for (int i=0; i<fftdata.size(); i++)
     {
         std::cout << "fftdata size: " << fftdata[i].size() << std::endl;
     }
-    //}
+    //}*/
     this->setData(fftdata);
 }
 
@@ -271,4 +271,14 @@ std::vector<int> lfpInferenceEngine::PyList_toVecInt(PyObject* py_list) {
   }else{
     //handle error
   }
+}
+
+void lfpInferenceEngine::reportFFTdata() {
+    for (std::size_t i = 0; i < fftdata.size(); i++) {
+        std::cout << std::endl;
+        std::vector<double> inner_vector = fftdata[i];
+        for (std::size_t j = 0; j < inner_vector.size(); j++) {
+            std::cout << inner_vector[j] << ",";
+        }
+    }
 }

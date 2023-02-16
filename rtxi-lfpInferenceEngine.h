@@ -68,7 +68,9 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         PyObject *pScaler;
         PyObject *pData;
 
-        
+        std::vector<double> fft;
+        int count;
+        int fftstep;
 
 };
 

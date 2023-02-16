@@ -214,3 +214,22 @@ void lfpRatiometer::makeFFTabs() {
         fft_abs.push_back(sqrt(fftsqr));
     }
 }
+
+std::vector<double> lfpRatiometer::truncateFFT(const std::vector<double> freqs, std::vector<double> fft)
+{
+  std::vector<int> relevant_freqs;
+  for (int i=0; i<freqs.size(); i++)
+  {
+    if (freqs[i] > 1 && freqs[i] < 100) 
+    {
+      relevant_freqs.push_back(i);
+    }
+  }
+
+  std::vector<double> newFFT;
+  for (int i=0; i<relevant_freqs.size(); i++)
+  {
+    newFFT.push_back(fft[relevant_freqs[i]]);
+  }
+  return newFFT;
+}

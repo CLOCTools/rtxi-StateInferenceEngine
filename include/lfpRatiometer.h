@@ -63,6 +63,7 @@ class lfpRatiometer {
         // FFT calculations
         void makePSD();
         void makeFFTabs();
+        std::vector<double> truncateFFT(const std::vector<double> freqs, std::vector<double> fft);
         
     protected:
 
