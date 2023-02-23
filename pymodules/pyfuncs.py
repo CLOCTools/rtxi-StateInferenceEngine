@@ -12,6 +12,7 @@ import pickle
 import dim_red_funcs as dr
 import dim_red_utils as util
 import numpy as np
+import numba
 
 LOG_EPS = 1e-16
 DIV_EPS = 1e-16
@@ -26,6 +27,57 @@ def get_data(recording, experiment):
     data_dir = './data/%s' % experiment
     f,c,data,t = util.load_recording_data(recording, data_dir,'test',suffix=None)
     return data
+
+## NOTE: THESE NEED self.log_Ps from model.transitions
+## transition class is ssm.transitions.StationaryTransitions
+def transition_matrices(transition_matrix, data):
+    return np.exp(log_transition_matrices(transition_matrix, data))
+
+def log_transition_matrices(transition_matrix, data):
+    T = data.shape[0]
+    return np.tile(np.log(transition_matrix)[None, :, :], (T-1, 1, 1))
+
+## NOTE: THESE NEED self.mus and self.Sigmas from model.observations
+## observation class is ssm.observations.GaussianObservations
+import ssm.stats as stats
+def log_likelihoods(mus, Sigmas, data, mask=None):
+    if mask is not None and np.any(~mask) and not isinstance(mus, np.ndarray):
+        raise Exception("Current implementation of multivariate_normal_logpdf for masked data"
+                        "does not work with autograd because it writes to an array. "
+                        "Use DiagonalGaussian instead if you need to support missing data.")
+
+    # stats.multivariate_normal_logpdf supports broadcasting, but we get
+    # significant performance benefit if we call it with (TxD), (D,), and (D,D)
+    # arrays as inputs
+    return np.column_stack([stats.multivariate_normal_logpdf(data, mu, Sigma)
+                           for mu, Sigma in zip(mus, Sigmas)])
+
+
+
+def most_likely_states(m, pi0, Ps, log_likes, state_map, data):
+    # m = self.state_map
+    # pi0 = self.init_state_distn.initial_state_distn
+    # Ps = self.transitions.transition_matrices(data, input, mask, tag)
+    # log_likes = self.observations.log_likelihoods(data, input, mask, tag)
+    z_star = viterbi(replicate(pi0, m), Ps, replicate(log_likes, m))
+    return state_map[z_star]
+
+def replicate(x, state_map, axis=-1):
+    """
+    Replicate an array of shape (..., K) according to the given state map
+    to get an array of shape (..., R) where R is the total number of states.
+
+    Parameters
+    ----------
+    x : array_like, shape (..., K)
+        The array to be replicated.
+
+    state_map : array_like, shape (R,), int
+        The mapping from [0, K) -> [0, R)
+    """
+    assert state_map.ndim == 1
+    assert np.all(state_map >= 0) and np.all(state_map < x.shape[-1])
+    return np.take(x, state_map, axis=axis)
 
 def predict(model, feats, scaler, data):
     # Here we're going to force data to be an array since
@@ -77,8 +129,8 @@ def infer():
     f,c,data,t = util.load_recording_data(recording,data_dir,'test', suffix=None)
     return predict(model, feats, scaler, data)
 
-
-def viterbi(pi0, Ps, ll):
+@numba.jit(nopython=True, cache=True)
+def _viterbi(pi0, Ps, ll):
     """
     This is modified from pyhsmm.internals.hmm_states
     by Matthew Johnson.
@@ -107,42 +159,11 @@ def viterbi(pi0, Ps, ll):
     for t in range(1, T):
         z[t] = args[t, int(z[t-1])]
 
-    return z.astype(int)
+    return z
 
+def viterbi(pi0,Ps,ll):
+    return _viterbi(pi0,Ps,ll).astype(int)
 
-## NOTE: THESE NEED self.log_Ps from model.transitions
-## transition class is ssm.transitions.StationaryTransitions
-def transition_matrices(transition_matrix, data):
-    return np.exp(log_transition_matrices(transition_matrix, data))
-
-def log_transition_matrices(transition_matrix, data):
-    T = data.shape[0]
-    return np.tile(np.log(transition_matrix)[None, :, :], (T-1, 1, 1))
-
-## NOTE: THESE NEED self.mus and self.Sigmas from model.observations
-## observation class is ssm.observations.GaussianObservations
-import ssm.stats as stats
-def log_likelihoods(mus, Sigmas, data, mask=None):
-    if mask is not None and np.any(~mask) and not isinstance(mus, np.ndarray):
-        raise Exception("Current implementation of multivariate_normal_logpdf for masked data"
-                        "does not work with autograd because it writes to an array. "
-                        "Use DiagonalGaussian instead if you need to support missing data.")
-
-    # stats.multivariate_normal_logpdf supports broadcasting, but we get
-    # significant performance benefit if we call it with (TxD), (D,), and (D,D)
-    # arrays as inputs
-    return np.column_stack([stats.multivariate_normal_logpdf(data, mu, Sigma)
-                           for mu, Sigma in zip(mus, Sigmas)])
-
-
-
-def most_likely_states(m, pi0, Ps, log_likes, state_map, data):
-    # m = self.state_map
-    # pi0 = self.init_state_distn.initial_state_distn
-    # Ps = self.transitions.transition_matrices(data, input, mask, tag)
-    # log_likes = self.observations.log_likelihoods(data, input, mask, tag)
-    z_star = viterbi(replicate(pi0, m), Ps, replicate(log_likes, m))
-    return state_map[z_star]
 
 # def expected_states(self, data, input=None, mask=None, tag=None):
 #     m = self.state_map
@@ -165,19 +186,3 @@ def most_likely_states(m, pi0, Ps, log_likes, state_map, data):
 #     pzp1 = hmm_filter(replicate(pi0, m), Ps, replicate(log_likes, m))
 #     return collapse(pzp1, m)
 
-def replicate(x, state_map, axis=-1):
-    """
-    Replicate an array of shape (..., K) according to the given state map
-    to get an array of shape (..., R) where R is the total number of states.
-
-    Parameters
-    ----------
-    x : array_like, shape (..., K)
-        The array to be replicated.
-
-    state_map : array_like, shape (R,), int
-        The mapping from [0, K) -> [0, R)
-    """
-    assert state_map.ndim == 1
-    assert np.all(state_map >= 0) and np.all(state_map < x.shape[-1])
-    return np.take(x, state_map, axis=axis)
