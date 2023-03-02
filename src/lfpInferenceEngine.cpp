@@ -282,11 +282,13 @@ void lfpInferenceEngine::load() {
         return;
     }
     state_map = PyList_toVecInt(pStateMap);
+    //Py_DECREF(pResult);  // Causes error during lfpInferenceEngine.init()
 }
 
 void lfpInferenceEngine::load_ll() {
     PyObject *pPi0, *pPs, *pLl;
     PyObject *pT, *pK;
+
     if (!PyTuple_Check(pResult)) {
         printf("pResult is not a tuple! Make sure to call callPythonFunction correctly before loading.\n");
         return;
@@ -316,12 +318,13 @@ void lfpInferenceEngine::load_ll() {
     Py_DECREF(pPi0);
     Py_DECREF(pPs);
     Py_DECREF(pLl);
+    Py_DECREF(pResult);
     //Py_DECREF(pT);
     //Py_DECREF(pK);
 
-    std::cout << "pi0: " << pi0_flat.size() << endl;
-    std::cout << "Ps: " << Ps_flat.size() << endl;
-    std::cout << "ll: " << ll_flat.size() << endl;
+    //std::cout << "pi0: " << pi0_flat.size() << endl;
+    //std::cout << "Ps: " << Ps_flat.size() << endl;
+    //std::cout << "ll: " << ll_flat.size() << endl;
 }
 
 void lfpInferenceEngine::load_data() {
