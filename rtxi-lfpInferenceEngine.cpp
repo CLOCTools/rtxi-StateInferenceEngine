@@ -90,23 +90,36 @@ void rtxilfpInferenceEngine::execute(void) {
     count = 1;
   }
   count++;
-  state_vec = lfpinferenceengine.predict();
-  /*
-  arguments_predict = {"pyfuncs","predict"};
+  //state_vec = lfpinferenceengine.predict();
+
+  arguments_predict = {"pyfuncs","log_likes"};
   pyArgs = {lfpinferenceengine.getModel(),
-                                    lfpinferenceengine.getModel(),
-                                    lfpinferenceengine.getModel(),
-                                    lfpinferenceengine.getModel()};
+                                    lfpinferenceengine.getFeats(),
+                                    lfpinferenceengine.getScaler(),
+                                    lfpinferenceengine.getData()};
 
   lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
-  state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+  lfpinferenceengine.load_ll();
+  //std::cout << "pi0: " << pi0 << endl;
+    //std::cout << "Ps: " << Ps << endl;
+    //std::cout << "ll: " << ll << endl;
+  state_vec = lfpinferenceengine.viterbi(lfpinferenceengine.getPi0(),
+                                          lfpinferenceengine.getPs(),
+                                          lfpinferenceengine.getLl());
+
+  state_vec = lfpinferenceengine.mapStates(state_vec);
+
+
+  //lfpinferenceengine.callPredictFunction(pyArgs);
+  //state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
   
+  /*
   printf("Result of call: \n");
-      my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
-      for (int j = 0; j < my_vector.size(); j++) {
-      std::cout << my_vector[j] << " ";
-      }
-      std::cout << std::endl;
+  my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
+  for (int j = 0; j < my_vector.size(); j++) {
+  std::cout << my_vector[j] << " ";
+  }
+  std::cout << std::endl;
   */
   if (!state_vec.empty()) {
     state = state_vec.back();
@@ -163,24 +176,36 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
 
       //arguments_predict = {"pyfuncs","predict"};
       //start = std::chrono::high_resolution_clock::now();
-      state_vec = lfpinferenceengine.predict();
-      /*
+      //state_vec = lfpinferenceengine.predict();
+      
+      arguments_predict = {"pyfuncs","log_likes"};
       pyArgs = {lfpinferenceengine.getModel(),
-                                    lfpinferenceengine.getFeats(),
-                                    lfpinferenceengine.getScaler(),
-                                    lfpinferenceengine.getData()};
-      lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+                                        lfpinferenceengine.getFeats(),
+                                        lfpinferenceengine.getScaler(),
+                                        lfpinferenceengine.getData()};
 
-      state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
-      */
+      //PyRun_SimpleString("print(lfpinferenceengine.getData().size())");
+
+      lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+      lfpinferenceengine.load_ll();
+      //std::cout << "pi0: " << lfpinferenceengine.getPi0() << endl;
+      //std::cout << "Ps: " << lfpinferenceengine.getPs() << endl;
+      //std::cout << "ll: " << lfpinferenceengine.getLl() << endl;
+      state_vec = lfpinferenceengine.viterbi(lfpinferenceengine.getPi0(),
+                                              lfpinferenceengine.getPs(),
+                                              lfpinferenceengine.getLl());
+
+      state_vec = lfpinferenceengine.mapStates(state_vec);
+      //state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+      
       stop = std::chrono::high_resolution_clock::now();
       duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
       std::cout << "Predict time: " << duration.count() << std::endl;
       printf("Result of call: \n");
-      my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
-      for (int j = 0; j < my_vector.size(); j++) {
-      std::cout << my_vector[j] << " ";
+      //my_vector = PyList_toVecInt(lfpinferenceengine.getResult());
+      for (int j = 0; j < state_vec.size(); j++) {
+      std::cout << state_vec[j] << " ";
       }
       std::cout << std::endl;
       

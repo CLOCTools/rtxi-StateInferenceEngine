@@ -21,7 +21,7 @@ PYTHON_CXX_FLAGS=-I/home/dweiss38/anaconda3/envs/hmm/include/python3.10 -I/home/
 LD_FLAGS=-lfftw3 -lm
 PYTHON_LD_FLAGS=-L/home/dweiss38/anaconda3/envs/hmm/lib/python3.10/config-3.10-x86_64-linux-gnu -L/home/dweiss38/anaconda3/envs/hmm/lib -lpython3.10 -lcrypt -lpthread -ldl -lutil -lm -lm
 
-
+PYFUNCS_LD_FLAGS=-L/home/dweiss38/rtxi-modules/rtxi-lfpInferenceEngine/pymodules/viterbi_test.cpython-310-x86_64-linux-gnu.so
 # FFTW3 (not sure if necessary)
 #CXXFLAGS := $(CXXFLAGS) $(shell pkg-config --cflags fftw3)
 #LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs fftw3)

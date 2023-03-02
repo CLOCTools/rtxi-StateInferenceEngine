@@ -14,6 +14,8 @@ import dim_red_utils as util
 import numpy as np
 import numba
 
+from numba.pycc import CC
+
 LOG_EPS = 1e-16
 DIV_EPS = 1e-16
 
@@ -21,7 +23,7 @@ def get_model(recording, experiment, model_dir='./model'):
     file = '%s/%s_S1_%s.pkl' % (model_dir, recording, experiment)
     with open(file, 'rb') as pkl:
         model, feats, scaler = pickle.load(pkl)
-    return model, feats, scaler
+    return model, feats, scaler, model.state_map
 
 def get_data(recording, experiment):
     data_dir = './data/%s' % experiment
@@ -39,7 +41,7 @@ def log_transition_matrices(transition_matrix, data):
 
 ## NOTE: THESE NEED self.mus and self.Sigmas from model.observations
 ## observation class is ssm.observations.GaussianObservations
-import ssm.stats as stats
+#import ssm.stats as stats
 def log_likelihoods(mus, Sigmas, data, mask=None):
     if mask is not None and np.any(~mask) and not isinstance(mus, np.ndarray):
         raise Exception("Current implementation of multivariate_normal_logpdf for masked data"
@@ -49,10 +51,53 @@ def log_likelihoods(mus, Sigmas, data, mask=None):
     # stats.multivariate_normal_logpdf supports broadcasting, but we get
     # significant performance benefit if we call it with (TxD), (D,), and (D,D)
     # arrays as inputs
-    return np.column_stack([stats.multivariate_normal_logpdf(data, mu, Sigma)
+    return np.column_stack([multivariate_normal_logpdf(data, mu, Sigma)
                            for mu, Sigma in zip(mus, Sigmas)])
 
+def flatten_to_dim(X, d):
+    assert X.ndim >= d
+    assert d > 0
+    return np.reshape(X[None, ...], (-1,) + X.shape[-d:])
 
+from autograd.scipy.linalg import solve_triangular
+
+#@numba.jit(nopython=True,cache=True)
+def batch_mahalanobis(L, x):
+    # The most common shapes are x: (T, D) and L : (D, D)
+    # Special case that one
+    if x.ndim == 2 and L.ndim == 2:
+        xs = solve_triangular(L, x.T, lower=True)
+        return np.sum(xs**2, axis=0)
+
+    # Flatten the Cholesky into a (-1, D, D) array
+    flat_L = flatten_to_dim(L, 2)
+    # Invert each of the K arrays and reshape like L
+    L_inv = np.reshape(np.array([np.linalg.inv(Li.T) for Li in flat_L]), L.shape)
+    # dot with L_inv^T; square and sum.
+    xs = np.einsum('...i,...ij->...j', x, L_inv)
+    return np.sum(xs**2, axis=-1)
+
+
+#@numba.jit(nopython=True,cache=True)
+def multivariate_normal_logpdf(data, mus, Sigmas, Ls=None):
+    
+    # Check inputs
+    D = data.shape[-1]
+    #assert mus.shape[-1] == D
+    #assert Sigmas.shape[-2] == Sigmas.shape[-1] == D
+    #if Ls is not None:
+    #    assert Ls.shape[-2] == Ls.shape[-1] == D
+    #else:
+    Ls = np.linalg.cholesky(Sigmas)                              # (..., D, D)
+
+    # Quadratic term
+    lp = -0.5 * batch_mahalanobis(Ls, data - mus)                    # (...,)
+    # Normalizer
+    L_diag = np.reshape(Ls, Ls.shape[:-2] + (-1,))[..., ::D + 1]     # (..., D)
+    half_log_det = np.sum(np.log(abs(L_diag)), axis=-1)              # (...,)
+    lp = lp - 0.5 * D * np.log(2 * np.pi) - half_log_det             # (...,)
+
+    return lp
 
 def most_likely_states(m, pi0, Ps, log_likes, state_map, data):
     # m = self.state_map
@@ -100,6 +145,13 @@ def predict(model, feats, scaler, data):
     #m = model.state_map
     #return [1,1,1]
     return m[viterbi(replicate(pi0, m), Ps, replicate(log_likes, m))]
+    #return model.filter(obs)
+
+def log_likes(model, feats, scaler, data):
+    obs = dr.feature_projection(dr.scale_data(np.array(data),scaler),feats)
+    log_like = log_likelihoods(mus, Sigmas, obs)
+    T,K = replicate(log_like, m).shape
+    return list(replicate(pi0, m).flatten(order='F')), list(Ps.flatten(order='F')), list(replicate(log_like, m).flatten(order='F')), T, K
 
 def initialize(model, data):
     global pi0 
@@ -129,41 +181,10 @@ def infer():
     f,c,data,t = util.load_recording_data(recording,data_dir,'test', suffix=None)
     return predict(model, feats, scaler, data)
 
-@numba.jit(nopython=True, cache=True)
-def _viterbi(pi0, Ps, ll):
-    """
-    This is modified from pyhsmm.internals.hmm_states
-    by Matthew Johnson.
-    """
-    T, K = ll.shape
-
-    # Check if the transition matrices are stationary or
-    # time-varying (hetero)
-    hetero = (Ps.shape[0] == T-1)
-    if not hetero:
-        print(Ps.shape)
-        assert Ps.shape[0] == 1
-
-    # Pass max-sum messages backward
-    scores = np.zeros((T, K))
-    args = np.zeros((T, K))
-    for t in range(T-2,-1,-1):
-        vals = np.log(Ps[t * hetero] + LOG_EPS) + scores[t+1] + ll[t+1]
-        for k in range(K):
-            args[t+1, k] = np.argmax(vals[k])
-            scores[t, k] = np.max(vals[k])
-
-    # Now maximize forwards
-    z = np.zeros(T)
-    z[0] = (scores[0] + np.log(pi0 + LOG_EPS) + ll[0]).argmax()
-    for t in range(1, T):
-        z[t] = args[t, int(z[t-1])]
-
-    return z
+import viterbi_test
 
 def viterbi(pi0,Ps,ll):
-    return _viterbi(pi0,Ps,ll).astype(int)
-
+    return viterbi_test.viterbi(pi0,Ps,ll).astype(int)
 
 # def expected_states(self, data, input=None, mask=None, tag=None):
 #     m = self.state_map
@@ -186,3 +207,5 @@ def viterbi(pi0,Ps,ll):
 #     pzp1 = hmm_filter(replicate(pi0, m), Ps, replicate(log_likes, m))
 #     return collapse(pzp1, m)
 
+def compiler():
+    cc.compile()

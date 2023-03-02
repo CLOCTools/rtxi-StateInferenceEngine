@@ -41,6 +41,7 @@ void lfpInferenceEngine::init(string recording, string modelname) {
     std::vector<std::string> arguments_load = {"pyfuncs","get_model", recording, modelname};
     this->callPythonFunction(arguments_load,{});
     this->load();
+    //this->loadModule("pyfuncs","predict");
     
     //std::vector<std::string> arguments_loaddata = {"pyfuncs","get_data", recording, modelname};
     //this->callPythonFunction(arguments_loaddata,{});
@@ -69,17 +70,21 @@ void lfpInferenceEngine::init(string recording, string modelname) {
 
     this->setData(fftdata);
     
+    // Set global variables in the python interpreter
     std::vector<std::string> arguments_initialize = {"pyfuncs","initialize"};
     std::vector<PyObject*> pyArgs = {this->getModel(),
                 this->getData()};
     this->callPythonFunction(arguments_initialize, pyArgs);
 
+    // Run prediction once to compile prediction code
     std::vector<std::string> arguments_predict = {"pyfuncs","predict"};
     pyArgs = {this->getModel(), 
                                     this->getFeats(), 
                                     this->getScaler(),
                                     this->getData()};
     this->callPythonFunction(arguments_predict, pyArgs);
+
+    //this->callPredictFunction(pyArgs);
 
     
 
@@ -172,6 +177,60 @@ int lfpInferenceEngine::callPythonFunction(vector<string> args, vector<PyObject*
 
 }
 
+/*
+void lfpInferenceEngine::loadModule(std::string name, std::string funcname) {
+    PyObject *pName;
+    pName = PyUnicode_DecodeFSDefault(name.c_str());
+    pyModule = PyImport_Import(pName);
+    Py_DECREF(pName);
+
+    if (pyModule != NULL) {
+        pyPredictFunc = PyObject_GetAttrString(pyModule, funcname.c_str());
+    }
+
+}
+
+
+int lfpInferenceEngine::callPredictFunction(vector<PyObject*> pyArgs) {
+
+    PyObject *pArgs, *pValue;
+    int i;
+
+    if (pyModule != NULL) {
+
+        if (pyPredictFunc && PyCallable_Check(pyPredictFunc)) {
+            if (pyArgs.size() !=4 ) {
+                fprintf(stderr, "length of pyArgs must be 4\n");
+                return 1;
+            }
+            else {
+                pArgs = PyTuple_New(pyArgs.size());
+                for (i = 0; i < pyArgs.size(); i++) {
+                    PyTuple_SetItem(pArgs, i, pyArgs[i]);
+                }
+            }
+            
+            pValue = PyObject_CallObject(pyPredictFunc, pArgs);
+            //Py_DECREF(pArgs);
+            if (pValue != NULL) {
+
+                this->pResult = Py_NewRef(pValue);
+
+                Py_DECREF(pValue);
+                //Py_DECREF(pResult);
+            }
+            else {
+                PyErr_Print();
+                fprintf(stderr,"Call failed\n");
+                return 1;
+            }
+        }
+        
+    }
+
+    return 0;
+}
+*/
 // Add FFT vector to back of data vector and erase first FFT
 void lfpInferenceEngine::pushFFTSample(std::vector<double> fft) {
     //std::cout << "fft size: " << fft.size() << std::endl;
@@ -218,10 +277,51 @@ void lfpInferenceEngine::load() {
         return;
     }
 
-    if (!PyArg_ParseTuple(pResult,"OOO", &pModel, &pFeats, &pScaler)) {
+    if (!PyArg_ParseTuple(pResult,"OOOO", &pModel, &pFeats, &pScaler, &pStateMap)) {
         printf("Failed to unpack tuple.\n");
         return;
     }
+    state_map = PyList_toVecInt(pStateMap);
+}
+
+void lfpInferenceEngine::load_ll() {
+    PyObject *pPi0, *pPs, *pLl;
+    PyObject *pT, *pK;
+    if (!PyTuple_Check(pResult)) {
+        printf("pResult is not a tuple! Make sure to call callPythonFunction correctly before loading.\n");
+        return;
+    }
+
+    if (!PyArg_ParseTuple(pResult,"OOOOO", &pPi0, &pPs, &pLl, &pT, &pK)) {
+        printf("Failed to unpack tuple.\n");
+        return;
+    }
+    long T = PyLong_AsLong(pT);
+    long K = PyLong_AsLong(pK);
+    // unpack pi0
+    std::vector<double> pi0_flat = PyList_toVecDouble(pPi0);
+    std::vector<double> Ps_flat = PyList_toVecDouble(pPs);
+    std::vector<double> ll_flat = PyList_toVecDouble(pLl);
+    
+    arma::mat pi0_const = arma::mat(pi0_flat);
+    pi0 = pi0_const.t();
+
+    //std::cout << "Made it here!" << std::endl;
+    Ps = this->buildPs(Ps_flat,T,K);
+
+    arma::mat ll_const = arma::mat(ll_flat);
+    ll_const.reshape(T,K);
+    ll = ll_const;
+
+    Py_DECREF(pPi0);
+    Py_DECREF(pPs);
+    Py_DECREF(pLl);
+    //Py_DECREF(pT);
+    //Py_DECREF(pK);
+
+    std::cout << "pi0: " << pi0_flat.size() << endl;
+    std::cout << "Ps: " << Ps_flat.size() << endl;
+    std::cout << "ll: " << ll_flat.size() << endl;
 }
 
 void lfpInferenceEngine::load_data() {
@@ -246,6 +346,7 @@ std::vector<int> lfpInferenceEngine::predict() {
 }
 
 std::vector<int> lfpInferenceEngine::PyList_toVecInt(PyObject* py_list) {
+    //std::cout << "Converting PyList to integer vector...\n" << std::endl;
   if (PySequence_Check(py_list)) {
     PyObject* seq = PySequence_Fast(py_list, "expected a sequence");
     if (seq != NULL){
@@ -259,6 +360,7 @@ std::vector<int> lfpInferenceEngine::PyList_toVecInt(PyObject* py_list) {
             //handle error
           }
           my_vector.push_back(value);
+          
         } else {
           //handle error
         }
@@ -273,6 +375,46 @@ std::vector<int> lfpInferenceEngine::PyList_toVecInt(PyObject* py_list) {
   }
 }
 
+std::vector<double> lfpInferenceEngine::PyList_toVecDouble(PyObject* py_list) {
+    //std::cout << "Converting PyList to double vector...\n" << std::endl;
+  std::vector<double> vec;
+    Py_ssize_t size = PyList_Size(py_list);
+    for (Py_ssize_t i = 0; i < size; i++) {
+        PyObject* item = PyList_GetItem(py_list, i);
+        double value = PyFloat_AsDouble(item);
+        vec.push_back(value);
+        //Py_DECREF(item);
+    }
+    return vec;
+}
+
+
+std::vector<arma::mat> lfpInferenceEngine::buildPs(std::vector<double> Ps_flat, long T, long K) {
+    //std::deque<double> deque(Ps_flat.begin(),Ps_flat.end());
+    T = (int) T;
+    K = (int) K;
+
+    std::deque<double> deque(0);
+    std::copy(Ps_flat.begin(),Ps_flat.end(), std::inserter(deque,deque.end()));
+    std::vector<arma::mat> vector(T);
+    for (int t = 0; t < T-1; t++) {
+        std::deque<double> deq_tmp(K*K);
+        for (int k = 0; k < K*K; k++) {
+            deq_tmp[k] = deque.front();
+            deque.pop_front();
+        }
+        std::vector<double> vec(deq_tmp.begin(), deq_tmp.end());
+        arma::mat mat = arma::mat(vec);
+        mat.reshape(K,K);
+        vector[t] = mat;
+        //deq_tmp.clear();
+        //vec.clear();
+        //std::cout << deque.size() << std::endl;
+    }
+    //std::cout << "Made it here2!" << std::endl;
+    return vector;
+}
+
 void lfpInferenceEngine::reportFFTdata() {
     for (std::size_t i = 0; i < fftdata.size(); i++) {
         std::cout << std::endl;
@@ -281,4 +423,57 @@ void lfpInferenceEngine::reportFFTdata() {
             std::cout << inner_vector[j] << ",";
         }
     }
+}
+
+arma::vec lfpInferenceEngine::viterbi(arma::mat pi0, std::vector<arma::mat> Ps, arma::mat ll) {
+    int T = ll.n_rows;
+    int K = ll.n_cols;
+
+    // Check if the transition matrices are stationary or
+    // time-varying (hetero)
+    bool hetero = (Ps.size() == T - 1);
+
+    //std::cout << "pi0: " << pi0 << endl;
+    //std::cout << "Ps: " << Ps << endl;
+    //std::cout << "ll: " << ll << endl;
+
+    // Pass max-sum messages backward
+    arma::mat scores(T, K, arma::fill::zeros);
+    arma::mat args(T, K, arma::fill::zeros);
+    const double LOG_EPS = 1e-8;
+    for (int t = T - 2; t >= 0; t--) {
+        arma::mat vals(K, K, arma::fill::zeros);
+        vals = arma::log(Ps[t] + LOG_EPS);
+        vals.each_row() += scores.row(t+1) + ll.row(t+1);
+        for (int k = 0; k < K; k++) {
+            args(t + 1, k) = vals.row(k).index_max();
+            scores(t, k) = vals.row(k).max();
+        }
+    }
+    //std::cout << "Made it here3!" << std::endl;
+    // Now maximize forwards
+    arma::vec z(T,1,arma::fill::zeros);
+    //std::cout << args << std::endl;
+    //std::cout << scores << std::endl;
+    //std::cout << "scores.row(0): " << scores.row(0) << std::endl;
+    //std::cout << "log(pi0): " << arma::log(pi0) << std::endl;
+    //std::cout << "ll.row(0): " << ll.row(0) << std::endl;
+    z(0) = (scores.row(0) + arma::log(pi0) + ll.row(0)).index_max();
+    //std::cout << "Made it here4!" << std::endl;
+    for (int t = 1; t < T; t++) {
+        z(t) = args(t, z[t - 1]);
+    }
+    //std::cout << "Made it here5!" << std::endl;
+
+    return z;
+}
+
+arma::vec lfpInferenceEngine::mapStates(arma::vec states) {
+    int J = states.size();
+    arma::vec mappedStates(J);
+    
+    for (int j = 0; j < J; j++) {
+        mappedStates(j) = state_map[states(j)];
+    }
+    return mappedStates;
 }

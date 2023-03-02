@@ -11,7 +11,9 @@ CXXFLAGS := $(CXXFLAGS) -I. -Iinclude -I/usr/local/include/rtxi -I/usr/local/inc
 LDFLAGS  := $(LDFLAGS) -lfftw3 -lm -L/usr/local/lib/rtxi/libs -ldl -lbacktrace -lQt5OpenGL -lQt5PrintSupport -lQt5Xml -lQt5Svg -lQt5Widgets -lQt5Gui -lQt5Network -lQt5Core -L/usr/lib/x86_64-linux-gnu -lgit2 -lqwt-qt5 -L/usr/lib/x86_64-linux-gnu/hdf5/serial -lhdf5 -lhdf5_hl -lGL -lpthread -lgsl -lgslcblas -lm -ldl -L/usr/local/lib -lpthread -module -avoid-version
 
 PYTHON_CXX_FLAGS=-I/home/dweiss38/anaconda3/envs/hmm/include/python3.10 -I/home/dweiss38/anaconda3/envs/hmm/include/python3.10 -Wno-unused-result -Wsign-compare -march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O3 -ffunction-sections -pipe -isystem /home/dweiss38/anaconda3/envs/hmm/include -fdebug-prefix-map=/croot/python-split_1673450009074/work=/usr/local/src/conda/python-3.10.9 -fdebug-prefix-map=/home/dweiss38/anaconda3/envs/hmm=/usr/local/src/conda-prefix -fuse-linker-plugin -ffat-lto-objects -flto-partition=none -flto -DNDEBUG -fwrapv -O3 -Wall
-PYTHON_LD_FLAGS=-L/home/dweiss38/anaconda3/envs/hmm/lib/python3.10/config-3.10-x86_64-linux-gnu -L/home/dweiss38/anaconda3/envs/hmm/lib -lpython3.10 -lcrypt -lpthread -ldl -lutil -lm -lm
+PYTHON_LD_FLAGS=-L/home/dweiss38/anaconda3/envs/hmm/lib/python3.10/config-3.10-x86_64-linux-gnu -L/home/dweiss38/anaconda3/envs/hmm/lib -lpython3.10 -lcrypt -lpthread -ldl -lutil -lm -lm 
+
+PYFUNCS_LD_FLAGS=-L/home/dweiss38/rtxi-modules/rtxi-lfpInferenceEngine/pymodules/viterbi_test.cpython-310-x86_64-linux-gnu.so
 
 ifdef DEBUG 
 CXXFLAGS += -DDEBUG
@@ -23,10 +25,10 @@ MOOBJECTS = $(shell echo $(HEADERS) | sed "s/\.h[ \t\n]*/\.lo /g")
 all: $(PLUGIN_NAME).la
 
 %.lo: %.cpp
-	$(CXXCOMPILE) $(CXXFLAGS) $(PYTHON_CXX_FLAGS) $(PYTHON_LD_FLAGS) -c $< -o $@
+	$(CXXCOMPILE) $(CXXFLAGS) $(PYTHON_CXX_FLAGS) $(PYFUNCS_LD_FLAGS) $(PYTHON_LD_FLAGS) -c $< -o $@
 
 $(PLUGIN_NAME).la: $(OBJECTS) $(SOURCES) $(HEADERS)
-	$(CXXLINK) $(CXXFLAGS) $(PYTHON_CXX_FLAGS) $(LIBS) $(LDFLAGS) $(PYTHON_LD_FLAGS) $(OBJECTS) -rpath `readlink -f $(exec_modeldir)` -o $(PLUGIN_NAME).la
+	$(CXXLINK) $(CXXFLAGS) $(PYTHON_CXX_FLAGS) $(LIBS) $(LDFLAGS) $(PYFUNCS_LD_FLAGS) $(PYTHON_LD_FLAGS) $(OBJECTS) -rpath `readlink -f $(exec_modeldir)` -o $(PLUGIN_NAME).la
 
 install: $(PLUGIN_NAME).la
 	$(LIBTOOL) --mode=install cp $(PLUGIN_NAME).la `readlink -f $(exec_modeldir)`

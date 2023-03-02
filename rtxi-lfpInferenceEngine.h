@@ -50,7 +50,7 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         
         // declarations for state inference
         int state;
-        std::vector<int> state_vec;
+        arma::vec state_vec;
 
         // parameters for inputs into python functions
         std::vector<std::string> arguments_predict;
@@ -63,10 +63,10 @@ class rtxilfpInferenceEngine : public DefaultGUIModel {
         // variables for GUI
         QComboBox* windowShape;
 
-        PyObject *pModel;
-        PyObject *pFeats;
-        PyObject *pScaler;
-        PyObject *pData;
+        //PyObject *pModel;
+        //PyObject *pFeats;
+        //PyObject *pScaler;
+        //PyObject *pData;
 
         std::vector<double> fft;
         int count;
