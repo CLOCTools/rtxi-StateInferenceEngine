@@ -399,7 +399,7 @@ std::vector<arma::mat> lfpInferenceEngine::buildPs(std::vector<double> Ps_flat, 
 
     std::deque<double> deque(0);
     std::copy(Ps_flat.begin(),Ps_flat.end(), std::inserter(deque,deque.end()));
-    std::vector<arma::mat> vector(T);
+    std::vector<arma::mat> vector(T-1);
     for (int t = 0; t < T-1; t++) {
         std::deque<double> deq_tmp(K*K);
         for (int k = 0; k < K*K; k++) {
@@ -479,4 +479,12 @@ arma::vec lfpInferenceEngine::mapStates(arma::vec states) {
         mappedStates(j) = state_map[states(j)];
     }
     return mappedStates;
+}
+
+void lfpInferenceEngine::reportPs() {
+    char str[80];
+    for (std::size_t i = 0; i < Ps.size(); i++) {
+        std::cout << sprintf(str,"Ps(%d): ",i);
+        std::cout << Ps[i] << std::endl;
+    }
 }

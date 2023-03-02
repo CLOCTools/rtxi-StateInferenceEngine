@@ -135,6 +135,7 @@ void rtxilfpInferenceEngine::execute(void) {
 // update function (not running in real time)
 void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
 {
+  //std::vector<int> my_vec;
   switch (flag) {
     case INIT:
       setParameter("Time Window (s)", sampling/N);
@@ -187,16 +188,20 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
       //PyRun_SimpleString("print(lfpinferenceengine.getData().size())");
 
       lfpinferenceengine.callPythonFunction(arguments_predict, pyArgs);
+      
       lfpinferenceengine.load_ll();
       //std::cout << "pi0: " << lfpinferenceengine.getPi0() << endl;
-      //std::cout << "Ps: " << lfpinferenceengine.getPs() << endl;
+      //std::cout << "Ps[0]: " << lfpinferenceengine.getPs()[0] << endl;
+      //lfpinferenceengine.reportPs();
       //std::cout << "ll: " << lfpinferenceengine.getLl() << endl;
       state_vec = lfpinferenceengine.viterbi(lfpinferenceengine.getPi0(),
                                               lfpinferenceengine.getPs(),
                                               lfpinferenceengine.getLl());
 
       state_vec = lfpinferenceengine.mapStates(state_vec);
+      
       //state_vec = PyList_toVecInt(lfpinferenceengine.getResult());
+      //my_vec = PyList_toVecInt(lfpinferenceengine.getResult());
       
       stop = std::chrono::high_resolution_clock::now();
       duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
@@ -226,7 +231,7 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
       break;
 
     case PAUSE:
-      lfpinferenceengine.reportFFTdata();
+      //lfpinferenceengine.reportFFTdata();
       lfpratiometer.clrTimeSeries();
       break;
 

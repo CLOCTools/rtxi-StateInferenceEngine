@@ -47,6 +47,7 @@ class lfpInferenceEngine {
         void setData(std::vector<std::vector<double>> newData);
         void pushFFTSample(std::vector<double> fft);
         void reportFFTdata();
+        void reportPs();
 
         PyObject* getResult() {return pResult;};
         PyObject* getModel() {return pModel;};

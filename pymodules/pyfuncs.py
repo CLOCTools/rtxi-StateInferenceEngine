@@ -151,7 +151,7 @@ def log_likes(model, feats, scaler, data):
     obs = dr.feature_projection(dr.scale_data(np.array(data),scaler),feats)
     log_like = log_likelihoods(mus, Sigmas, obs)
     T,K = replicate(log_like, m).shape
-    return list(replicate(pi0, m).flatten(order='F')), list(Ps.flatten(order='F')), list(replicate(log_like, m).flatten(order='F')), T, K
+    return list(replicate(pi0, m).flatten(order='F')), list(np.moveaxis(Ps,0,-1).flatten(order='F')), list(replicate(log_like, m).flatten(order='F')), T, K
 
 def initialize(model, data):
     global pi0 
@@ -181,10 +181,45 @@ def infer():
     f,c,data,t = util.load_recording_data(recording,data_dir,'test', suffix=None)
     return predict(model, feats, scaler, data)
 
-import viterbi_test
+@numba.jit(nopython=True, cache=True)
+def _viterbi(pi0, Ps, ll):
+    """
+    This is modified from pyhsmm.internals.hmm_states
+    by Matthew Johnson.
+    """
+    T, K = ll.shape
+
+    # Check if the transition matrices are stationary or
+    # time-varying (hetero)
+    hetero = (Ps.shape[0] == T-1)
+    if not hetero:
+        print(Ps.shape)
+        assert Ps.shape[0] == 1
+
+    # Pass max-sum messages backward
+    scores = np.zeros((T, K))
+    args = np.zeros((T, K))
+    for t in range(T-2,-1,-1):
+        vals = np.log(Ps[t * hetero] + LOG_EPS) + scores[t+1] + ll[t+1]
+        for k in range(K):
+            args[t+1, k] = np.argmax(vals[k])
+            scores[t, k] = np.max(vals[k])
+
+    # Now maximize forwards
+    z = np.zeros(T)
+    z[0] = (scores[0] + np.log(pi0 + LOG_EPS) + ll[0]).argmax()
+    for t in range(1, T):
+        z[t] = args[t, int(z[t-1])]
+
+    return z
 
 def viterbi(pi0,Ps,ll):
-    return viterbi_test.viterbi(pi0,Ps,ll).astype(int)
+    return _viterbi(pi0,Ps,ll).astype(int)
+
+#import viterbi_test
+
+#def viterbi(pi0,Ps,ll):
+#    return viterbi_test.viterbi(pi0,Ps,ll).astype(int)
 
 # def expected_states(self, data, input=None, mask=None, tag=None):
 #     m = self.state_map
