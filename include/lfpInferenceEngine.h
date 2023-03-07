@@ -84,8 +84,10 @@ class lfpInferenceEngine {
         //PyObject *pyModule;
         //PyObject *pyPredictFunc;
 
-        std::vector<std::vector<double>> fftdata;
         int N; //how many FFT samples to hold in memory
+        int M; //how many frequency bins in each FFT: SHOULD MAKE THIS LOADED FROM MODEL
+        std::vector<std::vector<double>> fftdata;
+        
 
         arma::mat pi0;
         std::vector<arma::mat> Ps;
