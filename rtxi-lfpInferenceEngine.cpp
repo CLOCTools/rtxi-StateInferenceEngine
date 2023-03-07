@@ -44,8 +44,8 @@ period(((double)RT::System::getInstance()->getPeriod())*1e-9), // grabbing RT pe
 sampling(1.0/period), // calculating RT sampling rate
 lfpratiometer(N, sampling), // constructing lfpRatiometer object
 lfpinferenceengine(),
-DEFAULT_ANIMAL("AP103_1"),
-DEFAULT_MODEL("a")
+DEFAULT_ANIMAL("no-animal"),
+DEFAULT_MODEL("no-model")
 {
     setWhatsThis("<p><b>lfpInferenceEngine:</b><br>Given an lfp input, this module estimates the cortical state.</p>");
     
@@ -53,7 +53,7 @@ DEFAULT_MODEL("a")
     model = DEFAULT_MODEL;
     count = 1;
     fftstep = 40;
-    lfpinferenceengine.init(animal.toStdString(),model.toStdString());
+    //lfpinferenceengine.init(animal.toStdString(),model.toStdString());
 
     DefaultGUIModel::createGUI(vars, num_vars);
     customizeGUI();
@@ -169,7 +169,7 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
 
       start = std::chrono::high_resolution_clock::now();
      
-      //lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
+      lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
       //pModel = Py_NewRef(lfpinferenceengine.getModel());
       //pFeats = Py_NewRef(lfpinferenceengine.getFeats());
       //pScaler = Py_NewRef(lfpinferenceengine.getScaler());
