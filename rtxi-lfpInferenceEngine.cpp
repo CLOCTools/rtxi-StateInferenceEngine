@@ -19,6 +19,8 @@ static DefaultGUIModel::variable_t vars[] = {
   { "LF Upper Bound", "LF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
   { "HF Lower Bound", "HF Lower Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
   { "HF Upper Bound", "HF Upper Bound", DefaultGUIModel::PARAMETER | DefaultGUIModel::DOUBLE,},
+  { "Time Context", "Time Context", DefaultGUIModel::PARAMETER | DefaultGUIModel::INTEGER,},
+  //{ "FFT step", "FFT step", DefaultGUIModel::PARAMETER | DefaultGUIModel::INTEGER,},
   { "Animal", "Animal name", DefaultGUIModel::COMMENT, },  
   { "Model", "Model name", DefaultGUIModel::COMMENT, },  
 
@@ -146,6 +148,8 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
       setParameter("HF Lower Bound", lfpratiometer.getFreqBounds()[2]);
       setParameter("HF Upper Bound", lfpratiometer.getFreqBounds()[3]);
 
+      setParameter("Time Context", lfpinferenceengine.getTimeContext());
+
       setParameter("Animal",animal);
       setParameter("Model",model);
 
@@ -168,6 +172,8 @@ void rtxilfpInferenceEngine::update(DefaultGUIModel::update_flags_t flag)
           getParameter("HF Upper Bound").toDouble());
 
       start = std::chrono::high_resolution_clock::now();
+
+      lfpinferenceengine.setTimeContext(getParameter("Time Context").toInt());
      
       lfpinferenceengine.init(getComment("Animal").toStdString(),getComment("Model").toStdString());
       //pModel = Py_NewRef(lfpinferenceengine.getModel());

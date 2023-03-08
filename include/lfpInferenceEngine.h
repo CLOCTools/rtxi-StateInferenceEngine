@@ -42,6 +42,8 @@ class lfpInferenceEngine {
         void setFeats(PyObject *newFeats);
         void setModel(PyObject *newModel);
         void setScaler(PyObject *newScaler);
+
+        void setTimeContext(int newN);
         
         // Data manipulation
         void setData(std::vector<std::vector<double>> newData);
@@ -56,8 +58,10 @@ class lfpInferenceEngine {
         PyObject* getInference() {return pInference;};
         PyObject* getData() {return pData;};
 
+        int getTimeContext() {return N;};
+
         arma::mat getPi0() {return pi0;};
-        std::vector<arma::mat> getPs(){return Ps;};
+        arma::mat getPs(){return Ps;};
         arma::mat getLl() {return ll;};
 
         std::vector<int> predict();
@@ -66,7 +70,7 @@ class lfpInferenceEngine {
         std::vector<double> PyList_toVecDouble(PyObject* py_list);
         std::vector<arma::mat> buildPs(std::vector<double> Ps_flat, long T, long K);
 
-        arma::vec viterbi(arma::mat pi0, std::vector<arma::mat> Ps, arma::mat ll);
+        arma::vec viterbi(arma::mat pi0, arma::mat Ps, arma::mat ll);
         arma::vec mapStates(arma::vec states);
         
     protected:
@@ -84,13 +88,13 @@ class lfpInferenceEngine {
         //PyObject *pyModule;
         //PyObject *pyPredictFunc;
 
-        int N; //how many FFT samples to hold in memory
-        int M; //how many frequency bins in each FFT: SHOULD MAKE THIS LOADED FROM MODEL
+        int N = 100; //how many FFT samples to hold in memory
+        int M = 51; //how many frequency bins in each FFT: SHOULD MAKE THIS LOADED FROM MODEL
         std::vector<std::vector<double>> fftdata;
         
 
         arma::mat pi0;
-        std::vector<arma::mat> Ps;
+        arma::mat Ps;
         arma::mat ll;
 
         std::vector<int> state_map;

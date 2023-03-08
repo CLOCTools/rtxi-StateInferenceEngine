@@ -151,7 +151,7 @@ def log_likes(model, feats, scaler, data):
     obs = dr.feature_projection(dr.scale_data(np.array(data),scaler),feats)
     log_like = log_likelihoods(mus, Sigmas, obs)
     T,K = replicate(log_like, m).shape
-    return list(replicate(pi0, m).flatten(order='F')), list(np.moveaxis(Ps,0,-1).flatten(order='F')), list(replicate(log_like, m).flatten(order='F')), T, K
+    return list(replicate(pi0, m).flatten(order='F')), list(Ps.flatten(order='F')), list(replicate(log_like, m).flatten(order='F')), T, K
 
 def initialize(model, data):
     global pi0 
@@ -161,8 +161,8 @@ def initialize(model, data):
     global m
 
     pi0 = model.init_state_distn.initial_state_distn
-    P = model.transitions.transition_matrix
-    Ps = transition_matrices(P, np.array(data))
+    Ps = model.transitions.transition_matrix
+    #Ps = transition_matrices(P, np.array(data))
     mus = model.observations.mus
     Sigmas = model.observations.Sigmas
     m = model.state_map
@@ -191,16 +191,12 @@ def _viterbi(pi0, Ps, ll):
 
     # Check if the transition matrices are stationary or
     # time-varying (hetero)
-    hetero = (Ps.shape[0] == T-1)
-    if not hetero:
-        print(Ps.shape)
-        assert Ps.shape[0] == 1
 
     # Pass max-sum messages backward
     scores = np.zeros((T, K))
     args = np.zeros((T, K))
     for t in range(T-2,-1,-1):
-        vals = np.log(Ps[t * hetero] + LOG_EPS) + scores[t+1] + ll[t+1]
+        vals = np.log(Ps + LOG_EPS) + scores[t+1] + ll[t+1]
         for k in range(K):
             args[t+1, k] = np.argmax(vals[k])
             scores[t, k] = np.max(vals[k])

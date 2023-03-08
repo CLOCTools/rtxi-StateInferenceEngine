@@ -69,9 +69,7 @@ void lfpInferenceEngine::init(string recording, string modelname) {
                 {6734.7340003597965,4465.834925657012,2055.4337770760576,4364.554134541243,4420.648999482229,1964.064075812053,1665.7412831876088,2578.2585846220486,2186.8491845922154,2042.6991229195737,1092.1941312439355,424.472151139931,1217.8020424854544,1538.8438136563427,1016.856797090871,713.3587278178514,688.1644155027806,885.4723772576893,857.2696998029596,1321.5635719747488,981.6129979947141,317.74168362729966,481.7690475094249,1175.8199977553122,1395.0348571666618,619.7069235634772,650.6528385904725,1124.9213069950881,661.1974547519018,1117.7991574095515,1428.8663042421338,734.5447407009307,343.015430009012,619.5383075197759,663.125843614683,189.32968636754276,299.02198848432465,661.8319708298301,558.1379467660001,281.97863958376155,209.5672086130417,139.3188109587527,211.81499431171915,214.73963382815953,533.6159603077865,533.27525805095,198.60225290178633,352.8890583506415,231.75192808073265,34.5761790992945,239.74371637998317}
                 };
     */
-    N = 100;
-    M = 51;
-    std::vector<std::vector<double>> vec(N, std::vector<double>(M,0.0));
+    std::vector<std::vector<double>> vec(1, std::vector<double>(M,0.0));
     fftdata = vec;
     this->setData(fftdata);
     
@@ -240,9 +238,10 @@ int lfpInferenceEngine::callPredictFunction(vector<PyObject*> pyArgs) {
 void lfpInferenceEngine::pushFFTSample(std::vector<double> fft) {
     //std::cout << "fft size: " << fft.size() << std::endl;
     fftdata.push_back(fft);
-    //if (fftdata.size() > N) {
+    if (fftdata.size() > N) {
     // cut it to size
-    fftdata.erase(fftdata.begin());
+        fftdata.erase(fftdata.begin());
+    }
     /*for (int i=0; i<fftdata.size(); i++)
     {
         std::cout << "fftdata size: " << fftdata[i].size() << std::endl;
@@ -261,6 +260,10 @@ void lfpInferenceEngine::setFeats(PyObject *newFeats) {
 
 void lfpInferenceEngine::setScaler(PyObject *newScaler) {
     pScaler = newScaler;
+}
+
+void lfpInferenceEngine::setTimeContext(int newTime) {
+    N = newTime;
 }
 
 void lfpInferenceEngine::setData(std::vector<std::vector<double>> newData) {
@@ -310,11 +313,14 @@ void lfpInferenceEngine::load_ll() {
     std::vector<double> Ps_flat = PyList_toVecDouble(pPs);
     std::vector<double> ll_flat = PyList_toVecDouble(pLl);
     
-    arma::mat pi0_const = arma::mat(pi0_flat);
-    pi0 = pi0_const.t();
+    //arma::mat pi0_const = arma::mat(pi0_flat);
+    pi0 = arma::mat(pi0_flat).t();
 
     //std::cout << "Made it here!" << std::endl;
-    Ps = this->buildPs(Ps_flat,T,K);
+    //Ps = this->buildPs(Ps_flat,T,K);
+    arma::mat Ps_const = arma::mat(Ps_flat);
+    Ps_const.reshape(K,K);
+    Ps = Ps_const;
 
     arma::mat ll_const = arma::mat(ll_flat);
     ll_const.reshape(T,K);
@@ -433,7 +439,7 @@ void lfpInferenceEngine::reportFFTdata() {
     }
 }
 
-arma::vec lfpInferenceEngine::viterbi(arma::mat pi0, std::vector<arma::mat> Ps, arma::mat ll) {
+arma::vec lfpInferenceEngine::viterbi(arma::mat pi0, arma::mat Ps, arma::mat ll) {
     int T = ll.n_rows;
     int K = ll.n_cols;
 
@@ -451,7 +457,9 @@ arma::vec lfpInferenceEngine::viterbi(arma::mat pi0, std::vector<arma::mat> Ps, 
     const double LOG_EPS = 1e-8;
     for (int t = T - 2; t >= 0; t--) {
         arma::mat vals(K, K, arma::fill::zeros);
-        vals = arma::log(Ps[t] + LOG_EPS);
+        //std::cout << "Made it here!" << endl;
+        vals = arma::log(Ps + LOG_EPS);
+        //std::cout << "Made it here2!" << endl;
         vals.each_row() += scores.row(t+1) + ll.row(t+1);
         for (int k = 0; k < K; k++) {
             args(t + 1, k) = vals.row(k).index_max();
