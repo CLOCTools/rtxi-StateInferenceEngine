@@ -43,7 +43,7 @@ def lda_accuracy(X_train,c_train,X_test,c_test):
 
 def normalize_features(features):
     # features should have size dimension of data x number of features
-    return features / np.linalg.norm(features,axis=0)
+    return features / np.linalg.norm(features,ord=1,axis=0)
 
 def feature_projection(X,features,norm=True): 
     # X should have size num_samples x dimension of data
