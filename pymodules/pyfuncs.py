@@ -20,7 +20,7 @@ LOG_EPS = 1e-16
 DIV_EPS = 1e-16
 
 def get_model(recording, experiment, model_dir='./model'):
-    file = '%s/%s_S1_%s.pkl' % (model_dir, recording, experiment)
+    file = '%s/%s/%s_S1_HSMM2D_pca.pkl' % (model_dir, experiment, recording)
     with open(file, 'rb') as pkl:
         model, feats, scaler = pickle.load(pkl)
     return model, feats, scaler, model.state_map
