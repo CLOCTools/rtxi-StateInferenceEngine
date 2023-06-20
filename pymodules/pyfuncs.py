@@ -14,7 +14,6 @@ import dim_red_utils as util
 import numpy as np
 import numba
 
-from numba.pycc import CC
 
 LOG_EPS = 1e-16
 DIV_EPS = 1e-16
@@ -100,10 +99,7 @@ def multivariate_normal_logpdf(data, mus, Sigmas, Ls=None):
     return lp
 
 def most_likely_states(m, pi0, Ps, log_likes, state_map, data):
-    # m = self.state_map
-    # pi0 = self.init_state_distn.initial_state_distn
-    # Ps = self.transitions.transition_matrices(data, input, mask, tag)
-    # log_likes = self.observations.log_likelihoods(data, input, mask, tag)
+    
     z_star = viterbi(replicate(pi0, m), Ps, replicate(log_likes, m))
     return state_map[z_star]
 
@@ -128,24 +124,9 @@ def predict(model, feats, scaler, data):
     # Here we're going to force data to be an array since
     # C++ doesn't have numpy data types
     obs = dr.feature_projection(dr.scale_data(np.array(data),scaler),feats)
-    # model.filter is erroring on assert np.abs(np.sum(pz_tp1t[t]) - 1.0) < 1e-8 
-    # (line 94 of messages). For now do viterbi but we should switch back to 
-    # filter later
-    
-    #Ps = model.transitions.transition_matrices(obs, input=None, mask=None, tag=None)
-    #Ps = np.exp(model.transitions.log_Ps)
-    
-    #log_likes = model.observations.log_likelihoods(obs, input=None, mask=None, tag=None)
-    #mus = model.observations.mus
-    #Sigmas = model.observations.Sigmas
-    #pi0 = model.init_state_distn.initial_state_distn
-    #P = model.transitions.transition_matrix
-    #Ps = transition_matrices(P, obs)
     log_likes = log_likelihoods(mus, Sigmas, obs)
-    #m = model.state_map
-    #return [1,1,1]
     return m[viterbi(replicate(pi0, m), Ps, replicate(log_likes, m))]
-    #return model.filter(obs)
+
 
 def log_likes(model, feats, scaler, data):
     obs = dr.feature_projection(dr.scale_data(np.array(data),scaler),feats)
@@ -212,31 +193,3 @@ def _viterbi(pi0, Ps, ll):
 def viterbi(pi0,Ps,ll):
     return _viterbi(pi0,Ps,ll).astype(int)
 
-#import viterbi_test
-
-#def viterbi(pi0,Ps,ll):
-#    return viterbi_test.viterbi(pi0,Ps,ll).astype(int)
-
-# def expected_states(self, data, input=None, mask=None, tag=None):
-#     m = self.state_map
-#     pi0 = self.init_state_distn.initial_state_distn
-#     Ps = self.transitions.transition_matrices(data, input, mask, tag)
-#     log_likes = self.observations.log_likelihoods(data, input, mask, tag)
-#     Ez, Ezzp1, normalizer = hmm_expected_states(replicate(pi0, m), Ps, replicate(log_likes, m))
-
-#     # Collapse the expected states
-#     Ez = collapse(Ez, m)
-#     Ezzp1 = collapse(collapse(Ezzp1, m, axis=2), m, axis=1)
-#     return Ez, Ezzp1, normalizer
-
-# @ensure_args_not_none
-# def filter(self, data, input=None, mask=None, tag=None):
-#     m = self.state_map
-#     pi0 = self.init_state_distn.initial_state_distn
-#     Ps = self.transitions.transition_matrices(data, input, mask, tag)
-#     log_likes = self.observations.log_likelihoods(data, input, mask, tag)
-#     pzp1 = hmm_filter(replicate(pi0, m), Ps, replicate(log_likes, m))
-#     return collapse(pzp1, m)
-
-def compiler():
-    cc.compile()
